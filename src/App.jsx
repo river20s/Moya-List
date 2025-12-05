@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Plus, 
-  Trash2, 
-  CheckCircle2, 
-  Circle, 
-  Menu, 
-  X, 
-  Tag, 
-  LayoutGrid,
-  Sparkles,
-  Loader2
+import {
+  Plus,
+  Trash2,
+  CheckCircle2,
+  Circle,
+  Menu,
+  X,
+  Tag,
+  LayoutGrid
 } from 'lucide-react';
 
 // --- Firebase Imports ---
@@ -42,10 +40,7 @@ const FIREBASE_CONFIG = import.meta.env.VITE_FIREBASE_API_KEY ? {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID
-} : null;
-
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || ""; 
+} : null; 
 
 // --- Helper ---
 const extractHashtag = (text) => {
@@ -58,17 +53,15 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState(['HTML', 'CSS', 'React', '수학', '알고리즘']);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  
+
   const [newItemText, setNewItemText] = useState('');
   const [newItemCategory, setNewItemCategory] = useState('');
-  const [aiAnswer, setAiAnswer] = useState('');
-  const [isAiLoading, setIsAiLoading] = useState(false);
 
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+
   const [auth, setAuth] = useState(null);
   const [db, setDb] = useState(null);
 
@@ -129,38 +122,10 @@ export default function App() {
     const text = e.target.value;
     setNewItemText(text);
     const detectedTag = extractHashtag(text);
-    if (detectedTag) setNewItemCategory(detectedTag);
-  };
-
-  const handleAskAI = async () => {
-    if (!newItemText) return alert("내용을 입력해주세요.");
-    
-    setIsAiLoading(true);
-    
-    // API 키가 없으면 시뮬레이션
-    if (!GEMINI_API_KEY) {
-       setTimeout(() => {
-           setAiAnswer("API 키가 설정되지 않아 시뮬레이션 답변을 드립니다.\n\n" + newItemText + "에 대한 요약입니다.");
-           setIsAiLoading(false);
-       }, 1500);
-       return;
-    }
-
-    try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `요약해줘: ${newItemText}` }] }]
-        })
-      });
-      const data = await response.json();
-      const answer = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      setAiAnswer(answer || "답변 실패");
-    } catch (error) {
-      setAiAnswer("에러: " + error.message);
-    } finally {
-      setIsAiLoading(false);
+    if (detectedTag) {
+      setNewItemCategory(detectedTag);
+    } else {
+      setNewItemCategory('');
     }
   };
 
@@ -176,16 +141,16 @@ export default function App() {
 
     const newItem = {
       text: newItemText,
-      summary: aiAnswer ? `[AI] ${aiAnswer}` : (newItemText.length > 50 ? newItemText.slice(0, 50) + "..." : ""), 
+      summary: "",
       category: finalCategory,
       status: 'unsolved',
-      createdAt: new Date().toISOString(), // 로컬용 날짜 포맷
+      createdAt: new Date().toISOString(),
     };
 
     if (user && db) {
       await addDoc(collection(db, 'artifacts', APP_ID, 'users', user.uid, 'moya_items'), {
         ...newItem,
-        createdAt: serverTimestamp() // 파이어베이스용 서버 시간
+        createdAt: serverTimestamp()
       });
     } else {
       const updatedItems = [{ ...newItem, id: Date.now().toString() }, ...items];
@@ -195,8 +160,6 @@ export default function App() {
 
     setNewItemText('');
     setNewItemCategory('');
-    setAiAnswer('');
-    setIsModalOpen(false);
   };
 
   const toggleStatus = async (id, currentStatus) => {
@@ -228,16 +191,68 @@ export default function App() {
     return statusMatch && catMatch;
   });
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleAddItem();
+    }
+  };
+
+  // 텍스트를 해시태그 하이라이트와 함께 렌더링
+  const renderHighlightedText = (text) => {
+    if (!text) return null;
+
+    const parts = [];
+    let lastIndex = 0;
+    const hashtagRegex = /#[\w가-힣]+/g;
+    let match;
+
+    while ((match = hashtagRegex.exec(text)) !== null) {
+      // 해시태그 이전 텍스트
+      if (match.index > lastIndex) {
+        parts.push(
+          <span key={`text-${lastIndex}`}>
+            {text.substring(lastIndex, match.index)}
+          </span>
+        );
+      }
+      // 해시태그
+      parts.push(
+        <span key={`hash-${match.index}`} className="text-indigo-600 font-semibold">
+          {match[0]}
+        </span>
+      );
+      lastIndex = match.index + match[0].length;
+    }
+
+    // 남은 텍스트
+    if (lastIndex < text.length) {
+      parts.push(
+        <span key={`text-${lastIndex}`}>
+          {text.substring(lastIndex)}
+        </span>
+      );
+    }
+
+    return <>{parts}</>;
+  };
+
+  // 스크롤 이벤트 핸들러
+  const handleScroll = (e) => {
+    const scrollTop = e.target.scrollTop;
+    setIsScrolled(scrollTop > 50);
+  };
+
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-800 font-sans overflow-hidden">
+    <div className="flex h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-800 font-sans overflow-hidden">
       {/* Sidebar */}
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} bg-white border-r border-slate-200 transition-all duration-300 flex flex-col z-20 absolute md:relative h-full`}>
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} bg-white border-r border-slate-200 transition-all duration-300 flex flex-col z-20 absolute md:relative h-full overflow-hidden`}>
         <div className="p-6 border-b border-slate-100 flex justify-between items-center">
           <div className="flex items-center gap-2 font-bold text-xl text-indigo-600">
             <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white">M</div>
-            <span className={`${!sidebarOpen && 'hidden'}`}>Moya List</span>
+            <span>Moya List</span>
           </div>
-          <button onClick={() => setSidebarOpen(false)} className="md:hidden text-slate-400"><X size={20}/></button>
+          <button onClick={() => setSidebarOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
@@ -265,110 +280,87 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 relative bg-slate-50 overflow-y-auto p-4 md:p-10" onClick={(e) => { if(e.target === e.currentTarget && !isModalOpen) setIsModalOpen(true); }}>
-        <div className="md:hidden w-full flex justify-between items-center mb-6">
-          <button onClick={() => setSidebarOpen(true)} className="p-2 bg-white rounded shadow-sm text-slate-600"><Menu size={20} /></button>
-          <span className="font-bold text-indigo-600">Moya List</span>
-          <div className="w-8"></div>
+      <main className="flex-1 flex flex-col h-screen overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 md:px-8 md:py-6 bg-white/80 backdrop-blur-sm border-b border-slate-200">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setSidebarOpen(true)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+              <Menu size={20} className="text-slate-600" />
+            </button>
+            <span className="font-bold text-xl text-indigo-600">Moya List</span>
+          </div>
+          <span className="text-xs text-slate-400">{FIREBASE_CONFIG ? "Firebase 연동됨" : "로컬 모드"}</span>
         </div>
 
-        {items.length === 0 && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-40">
-            <Plus size={40} className="text-slate-400 mb-4" />
-            <h2 className="text-2xl font-bold text-slate-400">화면을 클릭해 기록하세요</h2>
-            <p className="text-slate-400 mt-2">({FIREBASE_CONFIG ? "Firebase 연동됨" : "로컬 스토리지 모드"})</p>
-          </div>
-        )}
+        {/* Scrollable Container */}
+        <div className="flex-1 overflow-y-auto" onScroll={handleScroll}>
+          {/* Input Area - Large Hero Section */}
+          <div className={`sticky top-0 z-10 bg-white border-b border-slate-200 transition-all duration-500 ${isScrolled ? 'px-4 md:px-8 py-4' : 'px-4 md:px-8 py-12 md:py-24'}`}>
+            <div className="max-w-3xl mx-auto">
+              {/* Input with Highlight Overlay */}
+              <div className="relative">
+                <input
+                  type="text"
+                  value={newItemText}
+                  onChange={handleTextChange}
+                  onKeyDown={handleKeyDown}
+                  className={`w-full px-6 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:outline-none focus:border-indigo-400 focus:bg-white transition-all text-transparent caret-slate-800 ${isScrolled ? 'py-3 text-base' : 'py-6 text-2xl md:text-3xl'}`}
+                  autoFocus
+                />
+                {/* Highlight Overlay */}
+                <div className={`absolute inset-0 px-6 pointer-events-none flex items-center overflow-hidden text-slate-800 whitespace-pre-wrap ${isScrolled ? 'py-3 text-base' : 'py-6 text-2xl md:text-3xl'}`}>
+                  {newItemText ? renderHighlightedText(newItemText) : (
+                    <span className="text-slate-400">궁금한 것을 입력하세요... (# 으로 카테고리 지정, Enter로 등록)</span>
+                  )}
+                </div>
+              </div>
 
-        <div className="w-full max-w-4xl space-y-4 mx-auto pb-20">
-             {filteredItems.map(item => (
-                 <div key={item.id} className={`bg-white p-5 rounded-xl shadow-sm border transition-all hover:shadow-md ${item.status === 'solved' ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-200'}`}>
+              {newItemCategory && (
+                <div className="mt-3 flex items-center gap-2 text-sm text-indigo-600 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <Tag size={14} />
+                  <span>카테고리: {newItemCategory}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Items List */}
+          <div className="px-4 md:px-8 py-6">
+            {filteredItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center min-h-[60vh] opacity-40">
+                <Plus size={48} className="text-slate-400 mb-4" />
+                <h2 className="text-2xl font-bold text-slate-400">첫 궁금증을 등록해보세요</h2>
+                <p className="text-slate-400 mt-2">위 입력창에 입력 후 Enter를 누르세요</p>
+                <p className="text-slate-400 mt-4 text-sm">👇 스크롤을 내려보세요</p>
+              </div>
+            ) : (
+              <div className="max-w-3xl mx-auto space-y-4 pb-20">
+                {filteredItems.map(item => (
+                  <div
+                    key={item.id}
+                    className={`bg-white p-5 rounded-xl shadow-sm border transition-all hover:shadow-md ${item.status === 'solved' ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-200'}`}
+                  >
                     <div className="flex justify-between items-start mb-3">
-                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${item.status === 'solved' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
-                            {item.category}
-                        </span>
-                        <button onClick={() => toggleStatus(item.id, item.status)} className={`${item.status === 'solved' ? 'text-emerald-500' : 'text-slate-300 hover:text-amber-500'}`}>
-                             {item.status === 'solved' ? <CheckCircle2 size={20} /> : <Circle size={20} />}
-                        </button>
+                      <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${item.status === 'solved' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                        {item.category}
+                      </span>
+                      <button onClick={() => toggleStatus(item.id, item.status)} className={`${item.status === 'solved' ? 'text-emerald-500' : 'text-slate-300 hover:text-amber-500'}`}>
+                        {item.status === 'solved' ? <CheckCircle2 size={20} /> : <Circle size={20} />}
+                      </button>
                     </div>
                     <h3 className={`font-medium text-slate-800 mb-2 ${item.status === 'solved' && 'line-through text-slate-400'}`}>{item.text}</h3>
                     {item.summary && <p className="text-sm text-slate-500 mb-4 whitespace-pre-wrap">{item.summary}</p>}
                     <div className="flex justify-between items-end">
-                         <span className="text-[10px] text-slate-400">{item.createdAt && new Date(item.createdAt).toLocaleDateString()}</span>
-                         <button onClick={(e) => deleteItem(item.id, e)} className="text-slate-300 hover:text-red-400"><Trash2 size={16} /></button>
+                      <span className="text-[10px] text-slate-400">{item.createdAt && new Date(item.createdAt).toLocaleDateString()}</span>
+                      <button onClick={(e) => deleteItem(item.id, e)} className="text-slate-300 hover:text-red-400"><Trash2 size={16} /></button>
                     </div>
-                 </div>
-             ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </main>
-
-      {/* Input Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
-           <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
-              <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-bold text-lg text-slate-700">궁금증 기록</h3>
-                  <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
-              </div>
-              
-              <textarea
-                  className="w-full h-32 p-4 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none text-slate-700 mb-4"
-                  placeholder="내용을 입력하세요. (예: #React useEffect가 뭐지?)"
-                  value={newItemText}
-                  onChange={handleTextChange}
-                  autoFocus
-              />
-
-              {aiAnswer && (
-                  <div className="mb-4 p-3 bg-indigo-50 rounded-lg text-sm text-indigo-800 border border-indigo-100">
-                      <div className="flex items-center gap-2 font-bold mb-1">
-                          <Sparkles size={14} /> AI 답변:
-                      </div>
-                      {aiAnswer}
-                  </div>
-              )}
-              
-              <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
-                  <div className="flex items-center gap-2 w-full">
-                      <Tag size={16} className="text-slate-400" />
-                      <input 
-                        type="text" 
-                        value={newItemCategory}
-                        onChange={(e) => setNewItemCategory(e.target.value)}
-                        placeholder="카테고리 (자동)"
-                        className="bg-transparent text-sm text-slate-600 focus:outline-none w-full"
-                        list="category-list"
-                      />
-                      <datalist id="category-list">
-                          {categories.map(c => <option key={c} value={c} />)}
-                      </datalist>
-                  </div>
-
-                  <div className="flex gap-2 w-full md:w-auto">
-                      <button 
-                        onClick={handleAskAI}
-                        disabled={isAiLoading || !newItemText}
-                        className="flex-1 md:flex-none whitespace-nowrap px-4 py-2.5 bg-white border border-indigo-200 text-indigo-600 font-medium rounded-lg hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2"
-                      >
-                          {isAiLoading ? <Loader2 size={16} className="animate-spin"/> : <Sparkles size={16} />}
-                          AI에게 묻기
-                      </button>
-                      
-                      <button 
-                        onClick={handleAddItem}
-                        className="flex-1 md:flex-none whitespace-nowrap px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
-                      >
-                          등록
-                      </button>
-                  </div>
-              </div>
-           </div>
-        </div>
-      )}
-      
-      <button className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-lg flex items-center justify-center z-40" onClick={() => setIsModalOpen(true)}>
-          <Plus size={24} />
-      </button>
     </div>
   );
 }
