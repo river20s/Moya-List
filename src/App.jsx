@@ -33,12 +33,19 @@ import {
 } from 'firebase/firestore';
 
 // --- Global Config ---
-// 로컬에서 실행 시
 const APP_ID = 'moya-list-local';
 
-const FIREBASE_CONFIG = null; 
+const FIREBASE_CONFIG = import.meta.env.VITE_FIREBASE_API_KEY ? {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
+} : null;
 
-const GEMINI_API_KEY = ""; 
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
+const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || ""; 
 
 // --- Helper ---
 const extractHashtag = (text) => {
