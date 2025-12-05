@@ -43,9 +43,10 @@ const FIREBASE_CONFIG = import.meta.env.VITE_FIREBASE_API_KEY ? {
 } : null; 
 
 // --- Helper ---
-const extractHashtag = (text) => {
-  const match = text.match(/#([\w가-힣]+)/);
-  return match ? match[1] : null;
+const extractHashtags = (text) => {
+  const matches = text.match(/#[\w가-힣]+/g);
+  if (!matches) return [];
+  return matches.map(tag => tag.substring(1)); // Remove # prefix
 };
 
 export default function App() {
@@ -55,7 +56,7 @@ export default function App() {
   const [categories, setCategories] = useState(['HTML', 'CSS', 'React', '수학', '알고리즘']);
 
   const [newItemText, setNewItemText] = useState('');
-  const [newItemCategory, setNewItemCategory] = useState('');
+  const [newItemCategories, setNewItemCategories] = useState([]);
 
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
@@ -121,28 +122,27 @@ export default function App() {
   const handleTextChange = (e) => {
     const text = e.target.value;
     setNewItemText(text);
-    const detectedTag = extractHashtag(text);
-    if (detectedTag) {
-      setNewItemCategory(detectedTag);
-    } else {
-      setNewItemCategory('');
-    }
+    const detectedTags = extractHashtags(text);
+    setNewItemCategories(detectedTags);
   };
 
   const handleAddItem = async () => {
     if (!newItemText.trim()) return;
 
-    let finalCategory = newItemCategory || '기타';
-    if (!categories.includes(finalCategory)) {
-        const newCategories = [...categories, finalCategory];
-        setCategories(newCategories);
-        if (!db) localStorage.setItem('moya_categories', JSON.stringify(newCategories));
+    let finalCategories = newItemCategories.length > 0 ? newItemCategories : ['기타'];
+
+    // 새로운 카테고리 추가
+    const newCats = finalCategories.filter(cat => !categories.includes(cat));
+    if (newCats.length > 0) {
+      const updatedCategories = [...categories, ...newCats];
+      setCategories(updatedCategories);
+      if (!db) localStorage.setItem('moya_categories', JSON.stringify(updatedCategories));
     }
 
     const newItem = {
       text: newItemText,
       summary: "",
-      category: finalCategory,
+      categories: finalCategories,
       status: 'unsolved',
       createdAt: new Date().toISOString(),
     };
@@ -159,7 +159,7 @@ export default function App() {
     }
 
     setNewItemText('');
-    setNewItemCategory('');
+    setNewItemCategories([]);
   };
 
   const toggleStatus = async (id, currentStatus) => {
@@ -187,7 +187,11 @@ export default function App() {
 
   const filteredItems = items.filter(item => {
     const statusMatch = filterStatus === 'all' || item.status === filterStatus;
-    const catMatch = filterCategory === 'all' || item.category === filterCategory;
+
+    // 이전 데이터와 호환성 유지 (category 필드)
+    const itemCategories = item.categories || (item.category ? [item.category] : []);
+    const catMatch = filterCategory === 'all' || itemCategories.includes(filterCategory);
+
     return statusMatch && catMatch;
   });
 
@@ -315,10 +319,10 @@ export default function App() {
                 </div>
               </div>
 
-              {newItemCategory && (
+              {newItemCategories.length > 0 && (
                 <div className="mt-3 flex items-center gap-2 text-sm text-indigo-600 animate-in fade-in slide-in-from-top-2 duration-200">
                   <Tag size={14} />
-                  <span>카테고리: {newItemCategory}</span>
+                  <span>카테고리: {newItemCategories.join(', ')}</span>
                 </div>
               )}
             </div>
@@ -341,9 +345,13 @@ export default function App() {
                     className={`bg-white p-5 rounded-xl shadow-sm border transition-all hover:shadow-md ${item.status === 'solved' ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-200'}`}
                   >
                     <div className="flex justify-between items-start mb-3">
-                      <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${item.status === 'solved' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
-                        {item.category}
-                      </span>
+                      <div className="flex gap-2 flex-wrap">
+                        {(item.categories || (item.category ? [item.category] : ['기타'])).map((cat, idx) => (
+                          <span key={idx} className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${item.status === 'solved' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                            {cat}
+                          </span>
+                        ))}
+                      </div>
                       <button onClick={() => toggleStatus(item.id, item.status)} className={`${item.status === 'solved' ? 'text-emerald-500' : 'text-slate-300 hover:text-amber-500'}`}>
                         {item.status === 'solved' ? <CheckCircle2 size={20} /> : <Circle size={20} />}
                       </button>
