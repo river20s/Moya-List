@@ -6,15 +6,35 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
-chrome.contextMenus.onClicked.addListener((info, tab) => {
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === "save-to-moya" && info.selectionText) {
-    // 선택한 텍스트를 인코딩 (특수문자 깨짐 방지)
-    const text = encodeURIComponent(info.selectionText);
-    
-    // 로컬 주소 + 쿼리 파라미터(?text=...)
-    const targetUrl = `http://localhost:5173/?text=${text}`;
-    
-    // 새 탭 열기
-    chrome.tabs.create({ url: targetUrl });
+    const text = info.selectionText;
+
+    // 기존에 열려있는 MoyaList 탭 찾기
+    const tabs = await chrome.tabs.query({ url: "http://localhost:5173/*" });
+
+    if (tabs.length > 0) {
+      // 이미 열려있는 탭이 있으면 그 탭으로 포커스 이동
+      await chrome.tabs.update(tabs[0].id, { active: true });
+
+      // 탭에 메시지 전송하여 텍스트 추가
+      try {
+        await chrome.tabs.sendMessage(tabs[0].id, {
+          type: "ADD_TEXT",
+          text: text
+        });
+      } catch (error) {
+        console.error("Failed to send message:", error);
+        // 메시지 전송 실패 시 URL 파라미터 방식으로 폴백
+        const encodedText = encodeURIComponent(text);
+        await chrome.tabs.update(tabs[0].id, {
+          url: `http://localhost:5173/?text=${encodedText}`
+        });
+      }
+    } else {
+      // 열려있는 탭이 없으면 새 탭 열기
+      const encodedText = encodeURIComponent(text);
+      chrome.tabs.create({ url: `http://localhost:5173/?text=${encodedText}` });
+    }
   }
 });

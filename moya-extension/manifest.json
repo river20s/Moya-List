@@ -2,8 +2,14 @@
   "manifest_version": 3,
   "name": "MoyaList로 보내기",
   "version": "1.0",
-  "permissions": ["contextMenus"],
+  "permissions": ["contextMenus", "tabs"],
   "background": {
     "service_worker": "background.js"
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost:5173/*"],
+      "js": ["content.js"]
+    }
+  ]
 }
