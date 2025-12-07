@@ -13,15 +13,23 @@ import {
   User,
   Edit2,
   Check,
-  XCircle
+  XCircle,
+  MessageSquare
 } from 'lucide-react';
+
+// --- Markdown Imports ---
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // --- Firebase Imports ---
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
   signInAnonymously, 
-  onAuthStateChanged 
+  onAuthStateChanged,
+  GoogleAuthProvider, 
+  signInWithPopup,    
+  signOut
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -99,13 +107,17 @@ export default function App() {
   const [showColorPicker, setShowColorPicker] = useState(null); // 색상 선택기 표시 (태그 이름)
   const [colorPickerPosition, setColorPickerPosition] = useState({ top: 0, left: 0 }); // 색상 선택기 위치
 
+  const [expandedItemId, setExpandedItemId] = useState(null); // 내용 보기를 위해 확장된 아이템
+  const [editingItem, setEditingItem] = useState(null); // 요약 편집 중인 아이템
+  const [editingSummary, setEditingSummary] = useState(''); // 요약 편집 내용
+
   const [auth, setAuth] = useState(null);
   const [db, setDb] = useState(null);
 
   const editorRef = useRef(null);
   const compactEditorRef = useRef(null);
 
-  // 스크롤 상태 변경 시 텍스트 복사 및 포커스
+    // 스크롤 상태 변경 시 텍스트 복사 및 포커스
   const prevScrolledRef = useRef(isScrolled);
   useEffect(() => {
     // 스크롤 상태가 실제로 변경되었을 때만 실행
@@ -129,6 +141,27 @@ export default function App() {
     }
   }, []);
 
+  // --- URL 파라미터 감지 및 자동 저장 ---
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const textParam = params.get('text');
+
+    if (textParam) {
+      // 1. 해시태그 추출
+      const extractedTags = extractHashtags(textParam);
+      
+      // 2. 입력창에 보여주기 (사용자가 눈으로 확인하도록)
+      setNewItemText(textParam);
+      setNewItemCategories(extractedTags);
+
+      // 3. 기다리지 않고 바로 저장 함수 호출
+      handleAddItem(textParam, extractedTags);
+
+      // 4. 주소창 청소 (새로고침 시 중복 저장 방지)
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []); 
+
   // --- Init ---
   useEffect(() => {
     if (FIREBASE_CONFIG) {
@@ -136,23 +169,55 @@ export default function App() {
         const app = initializeApp(FIREBASE_CONFIG);
         const authInstance = getAuth(app);
         const dbInstance = getFirestore(app);
+        
         setAuth(authInstance);
         setDb(dbInstance);
 
-        // Firebase 사용 시에도 user를 null로 유지 (게스트모드 표시)
-        // signInAnonymously(authInstance).catch((error) => {
-        //     console.error("Auth Error:", error);
-        // });
+        // 1. Firebase 인증 상태 변화 감지 리스너 (여기가 핵심!)
+        const unsubscribe = onAuthStateChanged(authInstance, async (currentUser) => {
+          // 상태 업데이트: 이제 앱이 사용자가 누군지 알게 됩니다.
+          setUser(currentUser); 
+          
+          // 2. 로그인된 경우: 로컬(게스트) 데이터를 DB로 가져올지 물어봄
+          if (currentUser && dbInstance) {
+            const localItems = localStorage.getItem('moya_items');
+            
+            if (localItems) {
+              const parsedItems = JSON.parse(localItems);
+              
+              if (parsedItems.length > 0) {
+                const shouldMigrate = window.confirm(
+                  "게스트 모드에서 작성한 데이터가 있습니다. 로그인한 계정으로 가져오시겠습니까?"
+                );
 
-        // onAuthStateChanged(authInstance, (u) => setUser(u));
+                if (shouldMigrate) {
+                  // 로컬 데이터를 하나씩 DB에 저장
+                  for (const item of parsedItems) {
+                    const { id, ...itemData } = item; // 기존 ID 제외 (DB에서 자동생성)
+                    await addDoc(collection(dbInstance, 'artifacts', APP_ID, 'users', currentUser.uid, 'moya_items'), {
+                      ...itemData,
+                      createdAt: itemData.createdAt || new Date().toISOString() 
+                    });
+                  }
+                  // 가져오기 성공 후 로컬 데이터 비우기
+                  localStorage.removeItem('moya_items');
+                  alert("데이터 가져오기가 완료되었습니다! 이제 DB에 안전하게 저장됩니다.");
+                }
+              }
+            }
+          }
+        });
+
+        return () => unsubscribe(); // 정리 함수
       } catch (e) {
         console.error("Firebase init error:", e);
       }
     } else {
+      // (Firebase 설정 없을 때 로컬 모드 fallback - 기존 유지)
       console.log("Firebase 설정이 없어 로컬 스토리지 모드로 실행");
       const savedItems = localStorage.getItem('moya_items');
       if (savedItems) setItems(JSON.parse(savedItems));
-
+      
       const savedCats = localStorage.getItem('moya_categories');
       if (savedCats) setCategories(JSON.parse(savedCats));
 
@@ -194,12 +259,45 @@ export default function App() {
     setNewItemCategories(detectedTags);
   };
 
-  const handleAddItem = async () => {
-    if (!newItemText.trim()) return;
+  const handleGoogleLogin = async () => {
+    if (!auth) return; // Firebase 초기화 전이면 중단
 
-    let finalCategories = newItemCategories.length > 0 ? newItemCategories : ['기타'];
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      // 로그인 성공 시 모달 닫기
+      setShowLogin(false);
+    } catch (error) {
+      console.error("Login Failed:", error);
+      alert("로그인에 실패했습니다.");
+    }
+  };
 
-    // 새로운 카테고리 추가
+  const handleLogout = async () => {
+    if (!auth) return;
+    
+    if (window.confirm("로그아웃 하시겠습니까?")) {
+      try {
+        await signOut(auth);
+        // 로그아웃 후 user 상태는 onAuthStateChanged에서 자동으로 null 처리됨
+      } catch (error) {
+        console.error("Logout Failed:", error);
+      }
+    }
+  };
+
+  const handleAddItem = async (manualText = null, manualCategories = null) => {
+    // 1. 무엇을 저장할지 결정 (매개변수가 있으면 그것을, 없으면 입력창 상태를 사용)
+    const targetText = typeof manualText === 'string' ? manualText : newItemText;
+    const targetCategories = manualCategories || newItemCategories;
+
+    // 2. 빈 값 체크 (targetText를 검사해야 함!)
+    if (!targetText.trim()) return;
+
+    // 3. 카테고리 결정 (targetCategories를 사용해야 함!)
+    let finalCategories = targetCategories.length > 0 ? targetCategories : ['기타'];
+
+    // --- [중요] 새로운 카테고리 추가 로직 ---
     const newCats = finalCategories.filter(cat => !categories.includes(cat));
     if (newCats.length > 0) {
       const updatedCategories = [...categories, ...newCats];
@@ -207,14 +305,16 @@ export default function App() {
       if (!db) localStorage.setItem('moya_categories', JSON.stringify(updatedCategories));
     }
 
+    // --- 아이템 객체 생성 ---
     const newItem = {
-      text: newItemText,
+      text: targetText, 
       summary: "",
       categories: finalCategories,
       status: 'unsolved',
       createdAt: new Date().toISOString(),
     };
 
+    // --- DB 또는 로컬스토리지 저장 ---
     let addedId;
     if (user && db) {
       const docRef = await addDoc(collection(db, 'artifacts', APP_ID, 'users', user.uid, 'moya_items'), {
@@ -229,17 +329,20 @@ export default function App() {
       localStorage.setItem('moya_items', JSON.stringify(updatedItems));
     }
 
+    // --- UI 업데이트 및 초기화 ---
     // 새로 추가된 아이템 애니메이션 트리거
     setNewlyAddedId(addedId);
-    setTimeout(() => setNewlyAddedId(null), 800); // 애니메이션 후 상태 초기화
+    setTimeout(() => setNewlyAddedId(null), 800);
 
+    // 입력창 비우기 (State 초기화)
     setNewItemText('');
     setNewItemCategories([]);
 
-    // 모든 contenteditable 초기화
+    // contenteditable 요소 비우기
     if (editorRef.current) editorRef.current.textContent = '';
     if (compactEditorRef.current) compactEditorRef.current.textContent = '';
 
+    // 포커스 유지
     const currentEditor = isScrolled ? compactEditorRef.current : editorRef.current;
     if (currentEditor) currentEditor.focus();
   };
@@ -367,56 +470,46 @@ export default function App() {
     localStorage.setItem('moya_tag_colors', JSON.stringify(updatedColors));
   };
 
-  const filteredItems = items.filter(item => {
-    const statusMatch = filterStatus === 'all' || item.status === filterStatus;
+  // 아이템 클릭 핸들러 (확장/편집 전환)
+  const handleItemClick = (item) => {
+    // 이미 편집 중인 아이템을 다시 클릭하면 무시
+    if (editingItem && editingItem.id === item.id) return;
 
-    // 이전 데이터와 호환성 유지 (category 필드)
-    const itemCategories = item.categories || (item.category ? [item.category] : []);
-    const catMatch = filterCategory === 'all' || itemCategories.includes(filterCategory);
-
-    return statusMatch && catMatch;
-  });
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleAddItem();
+    // 이미 확장된 아이템을 클릭하면 편집 모드로 전환
+    if (expandedItemId === item.id) {
+      setExpandedItemId(null); // 확장 상태 해제
+      handleStartEditSummary(item);
+    } else {
+      // 다른 아이템을 클릭하면 확장
+      setExpandedItemId(item.id);
+      setEditingItem(null); // 편집 상태 해제
     }
   };
 
-  // 텍스트를 해시태그 하이라이트와 함께 렌더링 (입력창용 - 통일된 스타일)
-  const renderHighlightedText = (text) => {
-    if (!text) return null;
+  // 요약 편집 시작
+  const handleStartEditSummary = (item) => {
+    setEditingItem(item);
+    setEditingSummary(item.summary || '');
+  };
 
-    const parts = [];
-    let lastIndex = 0;
-    const hashtagRegex = /#[\w가-힣]+/g;
-    let match;
+  // 요약 편집 취소 또는 닫기
+  const handleCancelEditSummary = () => {
+    setEditingItem(null);
+    setEditingSummary('');
+  };
 
-    while ((match = hashtagRegex.exec(text)) !== null) {
-      // 해시태그 이전 텍스트
-      if (match.index > lastIndex) {
-        const beforeText = text.substring(lastIndex, match.index);
-        parts.push(beforeText);
-      }
-      // 해시태그 - 통일된 스타일 (진한 색상, 굵은 글씨)
-      parts.push(
-        <span
-          key={`hash-${match.index}`}
-          className="font-bold text-slate-700"
-        >
-          {match[0]}
-        </span>
-      );
-      lastIndex = match.index + match[0].length;
+  // 요약 편집 저장
+  const handleSaveSummary = async () => {
+    if (!editingItem) return;
+
+    if (user && db) {
+      await updateDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'moya_items', editingItem.id), { summary: editingSummary });
+    } else {
+      const updatedItems = items.map(item => item.id === editingItem.id ? { ...item, summary: editingSummary } : item);
+      setItems(updatedItems);
+      localStorage.setItem('moya_items', JSON.stringify(updatedItems));
     }
-
-    // 남은 텍스트
-    if (lastIndex < text.length) {
-      parts.push(text.substring(lastIndex));
-    }
-
-    return <>{parts}</>;
+    handleCancelEditSummary();
   };
 
   // 스크롤 snap 제어
@@ -462,6 +555,54 @@ export default function App() {
     }, 150);
   };
 
+  const filteredItems = items.filter(item => {
+    const statusMatch = filterStatus === 'all' || item.status === filterStatus;
+
+    // 이전 데이터와 호환성 유지 (category 필드)
+    const itemCategories = item.categories || (item.category ? [item.category] : []);
+    const catMatch = filterCategory === 'all' || itemCategories.includes(filterCategory);
+
+    return statusMatch && catMatch;
+  });
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleAddItem();
+    }
+  };
+
+  // 텍스트를 해시태그 하이라이트와 함께 렌더링 (입력창용 - 통일된 스타일)
+  const renderHighlightedText = (text) => {
+    if (!text) return null;
+
+    const parts = [];
+    let lastIndex = 0;
+    const hashtagRegex = /#[\w가-힣]+/g;
+    let match;
+
+    while ((match = hashtagRegex.exec(text)) !== null) {
+      // 해시태그 이전 텍스트
+      if (match.index > lastIndex) {
+        parts.push(text.substring(lastIndex, match.index));
+      }
+      // 해시태그 - 통일된 스타일 (진한 색상, 굵은 글씨)
+      parts.push(
+        <span key={`hash-${match.index}`} className="font-bold text-slate-700">
+          {match[0]}
+        </span>
+      );
+      lastIndex = match.index + match[0].length;
+    }
+
+    // 남은 텍스트
+    if (lastIndex < text.length) {
+      parts.push(text.substring(lastIndex));
+    }
+
+    return <>{parts}</>;
+  };
+
   return (
     <>
       {/* 게스트모드 안내 툴팁 - 최상위 레이어 */}
@@ -490,15 +631,28 @@ export default function App() {
                 <X size={24} />
               </button>
             </div>
-            <p className="text-slate-600 mb-6">
-              로그인 기능은 곧 추가될 예정입니다. 현재는 게스트모드로 사용하실 수 있습니다.
-            </p>
-            <button
-              onClick={() => setShowLogin(false)}
-              className="w-full py-3 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
-            >
-              닫기
-            </button>
+            {/* 로그인 모달 내용 수정 */}
+            <div className="flex flex-col gap-4">
+              <p className="text-slate-600 mb-2">
+                구글 계정으로 로그인하여 데이터를 안전하게 보관하세요.
+              </p>
+  
+              <button
+                onClick={handleGoogleLogin}
+                className="w-full py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+              >
+                {/* 구글 아이콘 대신 LogIn 아이콘 사용 혹은 텍스트만 */}
+                <LogIn size={20} />
+                Google 계정으로 로그인
+              </button>
+
+              <button
+                onClick={() => setShowLogin(false)}
+                className="w-full py-3 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                닫기
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -775,9 +929,20 @@ export default function App() {
                   </button>
                 </div>
               ) : (
-                <button className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-300/20 rounded-lg transition-colors">
-                  <User size={16} className="text-slate-600" />
-                  <span className="text-xs text-slate-600">프로필</span>
+                <button 
+                  onClick={handleLogout} // 로그아웃 핸들러 연결
+                  className="flex items-center gap-2 px-3 py-1.5 hover:bg-red-100/50 rounded-lg transition-colors group"
+                  title="클릭하여 로그아웃"
+                >
+                  {/* 구글 프로필 이미지가 있다면 보여주기 */}
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt="Profile" className="w-5 h-5 rounded-full" />
+                  ) : (
+                    <User size={16} className="text-slate-600 group-hover:text-red-500" />
+                  )}
+                  <span className="text-xs text-slate-600 group-hover:text-red-600">
+                    {user.displayName || '사용자'} (로그아웃)
+                  </span>
                 </button>
               )}
             </div>
@@ -890,18 +1055,16 @@ export default function App() {
                 {filteredItems.map(item => (
                   <div
                     key={item.id}
-                    className={`bg-[#F0EFEB] p-5 rounded-xl border transition-all ${item.status === 'solved' ? 'border-[#CAD3C0]' : 'border-slate-300/50'} ${item.id === newlyAddedId ? 'animate-sink-in' : ''}`}
+                    onClick={() => handleItemClick(item)}
+                    title={expandedItemId === item.id ? "클릭하여 편집" : "클릭하여 내용 보기"}
+                    className={`bg-white/50 p-5 rounded-xl border transition-all cursor-pointer ${item.status === 'solved' ? 'border-[#CAD3C0]' : 'border-slate-300/50'} ${item.id === newlyAddedId ? 'animate-sink-in' : ''}`}
                   >
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex gap-2 flex-wrap">
                         {(item.categories || (item.category ? [item.category] : ['기타'])).map((cat, idx) => {
                           const bgColor = getHashtagColor(cat, tagColors);
                           return (
-                            <span
-                              key={idx}
-                              className="px-2.5 py-1 rounded-lg text-xs font-medium"
-                              style={{ backgroundColor: bgColor }}
-                            >
+                            <span key={idx} className="px-2.5 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: bgColor }}>
                               {cat}
                             </span>
                           );
@@ -911,10 +1074,76 @@ export default function App() {
                         {item.status === 'solved' ? <CheckCircle2 size={20} /> : <Circle size={20} />}
                       </button>
                     </div>
-                    <h3 className={`font-medium text-slate-800 mb-2 ${item.status === 'solved' && 'line-through text-slate-400'}`}>{item.text}</h3>
-                    {item.summary && <p className="text-sm text-slate-500 mb-4 whitespace-pre-wrap">{item.summary}</p>}
+                    <h3 className={`font-medium text-slate-800 mb-3 ${item.status === 'solved' && 'line-through text-slate-400'}`}>{item.text}</h3>
+
+                    {/* --- 메모 표시/편집 영역 --- */}
+                    {editingItem?.id === item.id ? (
+                      // 편집 모드
+                      <div className="mt-4 space-y-4 animate-in fade-in duration-300">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Markdown 입력 */}
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-500 mb-1">Markdown</label>
+                            <textarea
+                              value={editingSummary}
+                              onChange={(e) => setEditingSummary(e.target.value)}
+                              maxLength={500} // 글자 수 제한 증가
+                              placeholder="메모를 Markdown으로 작성하세요..."
+                              className="w-full h-48 p-3 rounded-lg border border-slate-300 focus:outline-none focus:border-slate-400 resize-y text-sm font-mono"
+                              autoFocus
+                              onClick={(e) => e.stopPropagation()} // 카드 클릭 이벤트 전파 방지
+                            />
+                          </div>
+                          {/* 실시간 미리보기 */}
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-500 mb-1">Preview</label>
+                            <div className="w-full h-48 p-3 rounded-lg border border-slate-200 bg-slate-50/50 overflow-y-auto text-sm">
+                              <ReactMarkdown
+                                className="prose prose-sm max-w-none"
+                                remarkPlugins={[remarkGfm]}
+                                components={{ a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}
+                              >
+                                {editingSummary || "내용을 입력하면 미리보기가 표시됩니다."}
+                              </ReactMarkdown>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <div className="text-xs text-slate-400">
+                            {editingSummary.length} / 500
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <button onClick={(e) => { e.stopPropagation(); handleCancelEditSummary(); }} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors text-sm">
+                              취소
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); handleSaveSummary(); }} className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors text-sm">
+                              저장
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      // 보기 모드 (확장/축소)
+                      item.summary && (
+                        <div className="text-sm text-slate-600 mb-1">
+                          <ReactMarkdown
+                            className={`prose prose-sm max-w-none ${expandedItemId !== item.id && 'line-clamp-1'}`}
+                            remarkPlugins={[remarkGfm]}
+                            components={{ a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}
+                          >
+                            {item.summary}
+                          </ReactMarkdown>
+                        </div>
+                      )
+                    )}
+
                     <div className="flex justify-between items-end">
-                      <span className="text-[10px] text-slate-400">{item.createdAt && new Date(item.createdAt).toLocaleDateString()}</span>
+                      <div className="flex items-center gap-2 text-slate-400">
+                        {item.summary && (
+                          <MessageSquare size={12} title="메모가 있습니다." />
+                        )}
+                        <span className="text-[10px]">{item.createdAt && new Date(item.createdAt).toLocaleDateString()}</span>
+                      </div>
                       <button onClick={(e) => deleteItem(item.id, e)} className="text-slate-300 hover:text-red-400"><Trash2 size={16} /></button>
                     </div>
                   </div>
