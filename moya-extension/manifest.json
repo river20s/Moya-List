@@ -5,5 +5,11 @@
   "permissions": ["contextMenus", "tabs"],
   "background": {
     "service_worker": "background.js"
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost:5173/*"],
+      "js": ["content.js"]
+    }
+  ]
 }
