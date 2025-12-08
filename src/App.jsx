@@ -17,7 +17,16 @@ import {
   MessageSquare,
   Sparkles,
   Link as LinkIcon,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Search,
+  Calendar,
+  Filter,
+  Lightbulb,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  TrendingUp,
+  BarChart3
 } from 'lucide-react';
 
 
@@ -129,9 +138,14 @@ export default function App() {
   const [newItemText, setNewItemText] = useState('');
   const [newItemCategories, setNewItemCategories] = useState([]);
 
-  // ... (UI State 생략 없이 그대로 유지)
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterCategory, setFilterCategory] = useState('all');
+  // 필터 state
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [groupBy, setGroupBy] = useState('none'); // 'none', 'date', 'status'
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'solved', 'unsolved'
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [newlyAddedId, setNewlyAddedId] = useState(null);
@@ -145,6 +159,9 @@ export default function App() {
   const [tagColors, setTagColors] = useState({});
   const [showColorPicker, setShowColorPicker] = useState(null);
   const [colorPickerPosition, setColorPickerPosition] = useState({ top: 0, left: 0 });
+  const [tagSortOrder, setTagSortOrder] = useState('usage'); // 'usage', 'recent', 'alphabetical', 'custom'
+  const [customTagOrder, setCustomTagOrder] = useState([]);
+  const [draggedTagIndex, setDraggedTagIndex] = useState(null);
 
   const [detailModalItem, setDetailModalItem] = useState(null);
   const [detailDescription, setDetailDescription] = useState('');
@@ -315,6 +332,16 @@ export default function App() {
           } else {
             setTagColors({}); // 로컬 데이터가 없으면 빈 객체
           }
+
+          const savedCustomOrder = localStorage.getItem('moya_custom_tag_order');
+          if (savedCustomOrder) {
+            setCustomTagOrder(JSON.parse(savedCustomOrder));
+          }
+
+          const savedSortOrder = localStorage.getItem('moya_tag_sort_order');
+          if (savedSortOrder) {
+            setTagSortOrder(savedSortOrder);
+          }
         }
       });
       return () => unsubscribe();
@@ -329,6 +356,12 @@ export default function App() {
 
       const savedColors = localStorage.getItem('moya_tag_colors');
       if (savedColors) setTagColors(JSON.parse(savedColors));
+
+      const savedCustomOrder = localStorage.getItem('moya_custom_tag_order');
+      if (savedCustomOrder) setCustomTagOrder(JSON.parse(savedCustomOrder));
+
+      const savedSortOrder = localStorage.getItem('moya_tag_sort_order');
+      if (savedSortOrder) setTagSortOrder(savedSortOrder);
     }
   }, []); // 빈 배열: 최초 1회 실행
 
@@ -420,11 +453,34 @@ export default function App() {
       }
     );
 
+    // 사용자 문서 리스너 (태그 정렬 순서 등)
+    const userDocRef = doc(db, 'users', user.uid);
+    const unsubscribeUser = onSnapshot(
+      userDocRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          console.log('👤 User snapshot received:', data);
+
+          if (data.customTagOrder) {
+            setCustomTagOrder(data.customTagOrder);
+          }
+          if (data.tagSortOrder) {
+            setTagSortOrder(data.tagSortOrder);
+          }
+        }
+      },
+      (error) => {
+        console.error("❌ User snapshot error:", error);
+      }
+    );
+
     console.log('✅ Firestore listeners registered');
     return () => {
       console.log('🔌 Unsubscribing Firestore listeners');
       unsubscribeItems();
       unsubscribeSettings();
+      unsubscribeUser();
     };
   }, [user]); // user만 의존성으로 설정
 
@@ -448,6 +504,15 @@ export default function App() {
     });
     setUncategorizedCount(uncategorized.length);
   }, [items]);
+
+  // 태그 정렬 순서 저장
+  useEffect(() => {
+    localStorage.setItem('moya_tag_sort_order', tagSortOrder);
+    if (user && db) {
+      const userDocRef = doc(db, 'users', user.uid);
+      setDoc(userDocRef, { tagSortOrder }, { merge: true }).catch(console.error);
+    }
+  }, [tagSortOrder, user]);
 
   // --- Handlers ---
   const handleTextChange = (e) => {
@@ -694,6 +759,35 @@ export default function App() {
     if (filterCategory === tag) setFilterCategory('all');
   };
 
+  const handleDragStart = (e, index) => {
+    setDraggedTagIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    if (draggedTagIndex === null || draggedTagIndex === index) return;
+
+    const newOrder = [...customTagOrder];
+    const draggedTag = newOrder[draggedTagIndex];
+    newOrder.splice(draggedTagIndex, 1);
+    newOrder.splice(index, 0, draggedTag);
+
+    setCustomTagOrder(newOrder);
+    setDraggedTagIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedTagIndex(null);
+    // 수동 정렬 순서를 로컬 스토리지에 저장
+    localStorage.setItem('moya_custom_tag_order', JSON.stringify(customTagOrder));
+    // Firestore에도 저장
+    if (user && db) {
+      const userDocRef = doc(db, 'users', user.uid);
+      setDoc(userDocRef, { customTagOrder }, { merge: true }).catch(console.error);
+    }
+  };
+
   const handleChangeTagColor = (tag, color) => {
     const updatedColors = { ...tagColors, [tag]: color };
     setTagColors(updatedColors);
@@ -789,12 +883,66 @@ export default function App() {
     }, 150);
   };
 
+  // 태그 토글 함수
+  const toggleTag = (tag) => {
+    setSelectedTags(prev =>
+      prev.includes(tag)
+        ? prev.filter(t => t !== tag)
+        : [...prev, tag]
+    );
+  };
+
+  // 향상된 필터링 로직
   const filteredItems = items.filter(item => {
-    const statusMatch = filterStatus === 'all' || item.status === filterStatus;
-    const itemCategories = item.categories || (item.category ? [item.category] : []);
-    const catMatch = filterCategory === 'all' || itemCategories.includes(filterCategory);
-    return statusMatch && catMatch;
+    // 검색어 필터
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      const textMatch = item.text?.toLowerCase().includes(query);
+      const descMatch = item.description?.toLowerCase().includes(query);
+      if (!textMatch && !descMatch) return false;
+    }
+
+    // 상태 필터
+    if (statusFilter !== 'all' && item.status !== statusFilter) {
+      return false;
+    }
+
+    // 태그 필터 (여러 개 선택 가능)
+    if (selectedTags.length > 0) {
+      const itemCategories = item.categories || (item.category ? [item.category] : []);
+      const hasMatchingTag = selectedTags.some(tag => itemCategories.includes(tag));
+      if (!hasMatchingTag) return false;
+    }
+
+    // 날짜 필터
+    if (selectedDate) {
+      const itemDate = item.createdAt ? new Date(item.createdAt).toLocaleDateString('ko-KR') : null;
+      if (itemDate !== selectedDate) return false;
+    }
+
+    return true;
   });
+
+  // 그룹핑 로직
+  const groupedItems = () => {
+    if (groupBy === 'date') {
+      const groups = {};
+      filteredItems.forEach(item => {
+        const date = item.createdAt ? new Date(item.createdAt).toLocaleDateString('ko-KR') : '날짜 없음';
+        if (!groups[date]) groups[date] = [];
+        groups[date].push(item);
+      });
+      return Object.entries(groups).sort((a, b) => new Date(b[0]) - new Date(a[0]));
+    } else if (groupBy === 'status') {
+      const solved = filteredItems.filter(item => item.status === 'solved');
+      const unsolved = filteredItems.filter(item => item.status === 'unsolved');
+      const result = [];
+      if (unsolved.length > 0) result.push(['미해결', unsolved]);
+      if (solved.length > 0) result.push(['해결됨', solved]);
+      return result;
+    }
+    return [['all', filteredItems]];
+  };
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -817,6 +965,226 @@ export default function App() {
     if (lastIndex < text.length) parts.push(text.substring(lastIndex));
     return <>{parts}</>;
   };
+
+  // 컨트리뷰션 히트맵 데이터 생성
+  const getContributionData = () => {
+    const today = new Date();
+    const weeks = 12; // 12주간 표시
+    const days = weeks * 7;
+
+    // 날짜별 아이템 개수 맵 생성
+    const activityMap = {};
+    items.forEach(item => {
+      if (item.createdAt) {
+        const date = new Date(item.createdAt);
+        const dateKey = date.toISOString().split('T')[0];
+        activityMap[dateKey] = (activityMap[dateKey] || 0) + 1;
+      }
+    });
+
+    // 히트맵 데이터 생성
+    const heatmapData = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateKey = date.toISOString().split('T')[0];
+      const count = activityMap[dateKey] || 0;
+
+      heatmapData.push({
+        date: dateKey,
+        count: count,
+        level: count === 0 ? 0 : count <= 1 ? 1 : count <= 2 ? 2 : count <= 3 ? 3 : 4
+      });
+    }
+
+    return heatmapData;
+  };
+
+  const contributionData = getContributionData();
+
+  const getColorForLevel = (level) => {
+    const colors = {
+      0: '#E8EDE7',
+      1: '#B8D4AC',
+      2: '#8FBC7A',
+      3: '#5E994D',
+      4: '#3B7A2A'
+    };
+    return colors[level] || colors[0];
+  };
+
+  // 날짜별 아이템이 있는 날짜 목록 생성
+  const getUniqueDates = () => {
+    const dates = items
+      .filter(item => item.createdAt)
+      .map(item => new Date(item.createdAt).toLocaleDateString('ko-KR'))
+      .filter((date, index, self) => self.indexOf(date) === index)
+      .sort((a, b) => new Date(b) - new Date(a));
+    return dates;
+  };
+
+  const uniqueDates = getUniqueDates();
+
+  // 날짜-시간 포맷팅 함수
+  const formatDateTime = (dateString) => {
+    if (!dateString) return '날짜 없음';
+    const date = new Date(dateString);
+    return date.toLocaleString('ko-KR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // 캘린더 생성 함수
+  const generateCalendar = (currentMonth) => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+
+    const calendar = [];
+    let week = new Array(7).fill(null);
+
+    // 이전 달의 날짜로 채우기
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+    for (let i = startingDayOfWeek - 1; i >= 0; i--) {
+      week[i] = {
+        date: new Date(year, month - 1, prevMonthLastDay - (startingDayOfWeek - 1 - i)),
+        isCurrentMonth: false
+      };
+    }
+
+    // 현재 달의 날짜 채우기
+    let currentDay = 1;
+    for (let i = startingDayOfWeek; i < 7 && currentDay <= daysInMonth; i++) {
+      week[i] = {
+        date: new Date(year, month, currentDay),
+        isCurrentMonth: true
+      };
+      currentDay++;
+    }
+    calendar.push(week);
+
+    // 나머지 주 채우기
+    while (currentDay <= daysInMonth) {
+      week = new Array(7).fill(null);
+      for (let i = 0; i < 7 && currentDay <= daysInMonth; i++) {
+        week[i] = {
+          date: new Date(year, month, currentDay),
+          isCurrentMonth: true
+        };
+        currentDay++;
+      }
+
+      // 다음 달 날짜로 빈 칸 채우기
+      let nextMonthDay = 1;
+      for (let i = 0; i < 7; i++) {
+        if (!week[i]) {
+          week[i] = {
+            date: new Date(year, month + 1, nextMonthDay),
+            isCurrentMonth: false
+          };
+          nextMonthDay++;
+        }
+      }
+      calendar.push(week);
+    }
+
+    return calendar;
+  };
+
+  // 특정 날짜에 아이템이 있는지 확인
+  const getItemCountForDate = (date) => {
+    const dateStr = date.toLocaleDateString('ko-KR');
+    return items.filter(item =>
+      item.createdAt && new Date(item.createdAt).toLocaleDateString('ko-KR') === dateStr
+    ).length;
+  };
+
+  // 날짜가 선택된 날짜인지 확인
+  const isDateSelected = (date) => {
+    if (!selectedDate) return false;
+    return date.toLocaleDateString('ko-KR') === selectedDate;
+  };
+
+  // 오늘 날짜인지 확인
+  const isToday = (date) => {
+    const today = new Date();
+    return date.toDateString() === today.toDateString();
+  };
+
+  // 통계 계산 함수
+  const getCategoryStats = (daysAgo) => {
+    const now = new Date();
+    const targetDate = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000));
+
+    const recentItems = items.filter(item => {
+      if (!item.createdAt) return false;
+      const itemDate = new Date(item.createdAt);
+      return itemDate >= targetDate;
+    });
+
+    const categoryCount = {};
+    recentItems.forEach(item => {
+      const itemCategories = item.categories || (item.category ? [item.category] : ['기타']);
+      itemCategories.forEach(cat => {
+        categoryCount[cat] = (categoryCount[cat] || 0) + 1;
+      });
+    });
+
+    return Object.entries(categoryCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5); // 상위 5개만
+  };
+
+  const weeklyStats = getCategoryStats(7);
+  const monthlyStats = getCategoryStats(30);
+  const yearlyStats = getCategoryStats(365);
+
+  // 태그 정렬 함수
+  const getSortedCategories = () => {
+    if (tagSortOrder === 'custom' && customTagOrder.length > 0) {
+      // 커스텀 순서대로 정렬
+      const ordered = customTagOrder.filter(tag => categories.includes(tag));
+      const remaining = categories.filter(tag => !customTagOrder.includes(tag));
+      return [...ordered, ...remaining];
+    } else if (tagSortOrder === 'usage') {
+      // 사용 빈도순 (많이 사용된 순)
+      const usageCount = {};
+      items.forEach(item => {
+        const itemCategories = item.categories || (item.category ? [item.category] : []);
+        itemCategories.forEach(cat => {
+          usageCount[cat] = (usageCount[cat] || 0) + 1;
+        });
+      });
+      return [...categories].sort((a, b) => (usageCount[b] || 0) - (usageCount[a] || 0));
+    } else if (tagSortOrder === 'recent') {
+      // 최근 사용 순
+      const recentUse = {};
+      items.forEach(item => {
+        const itemCategories = item.categories || (item.category ? [item.category] : []);
+        const itemDate = item.createdAt ? new Date(item.createdAt).getTime() : 0;
+        itemCategories.forEach(cat => {
+          if (!recentUse[cat] || recentUse[cat] < itemDate) {
+            recentUse[cat] = itemDate;
+          }
+        });
+      });
+      return [...categories].sort((a, b) => (recentUse[b] || 0) - (recentUse[a] || 0));
+    } else if (tagSortOrder === 'alphabetical') {
+      // 가나다순
+      return [...categories].sort((a, b) => a.localeCompare(b, 'ko'));
+    }
+    return categories;
+  };
+
+  const sortedCategories = getSortedCategories();
 
 
   return (
@@ -926,6 +1294,144 @@ export default function App() {
         </div>
       )}
 
+      {/* 날짜 선택 모달 - 캘린더 뷰 */}
+      {showDatePicker && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4" onClick={() => setShowDatePicker(false)}>
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <Calendar size={20} />
+                날짜 선택
+              </h2>
+              <button
+                onClick={() => setShowDatePicker(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {selectedDate && (
+              <button
+                onClick={() => {
+                  setSelectedDate(null);
+                  setShowDatePicker(false);
+                }}
+                className="w-full p-3 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium mb-4"
+              >
+                <X size={14} className="inline mr-1" />
+                날짜 필터 해제
+              </button>
+            )}
+
+            {/* 캘린더 헤더 */}
+            <div className="flex items-center justify-between mb-4">
+              <button
+                onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1))}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <span className="text-lg font-semibold">
+                {calendarMonth.getFullYear()}년 {calendarMonth.getMonth() + 1}월
+              </span>
+              <button
+                onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1))}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+
+            {/* 요일 헤더 */}
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {['일', '월', '화', '수', '목', '금', '토'].map((day, idx) => (
+                <div
+                  key={day}
+                  className={`text-center text-xs font-semibold py-2 ${
+                    idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-slate-600'
+                  }`}
+                >
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {/* 캘린더 날짜 */}
+            <div className="space-y-1">
+              {generateCalendar(calendarMonth).map((week, weekIdx) => (
+                <div key={weekIdx} className="grid grid-cols-7 gap-1">
+                  {week.map((day, dayIdx) => {
+                    if (!day) return <div key={dayIdx} />;
+
+                    const count = getItemCountForDate(day.date);
+                    const isSelected = isDateSelected(day.date);
+                    const isTodayDate = isToday(day.date);
+                    const hasItems = count > 0;
+
+                    return (
+                      <button
+                        key={dayIdx}
+                        onClick={() => {
+                          if (day.isCurrentMonth && hasItems) {
+                            setSelectedDate(day.date.toLocaleDateString('ko-KR'));
+                            setShowDatePicker(false);
+                          }
+                        }}
+                        disabled={!hasItems || !day.isCurrentMonth}
+                        className={`
+                          relative aspect-square p-1 rounded-lg text-sm transition-all
+                          ${!day.isCurrentMonth ? 'text-slate-300' : ''}
+                          ${dayIdx === 0 ? 'text-red-500' : dayIdx === 6 ? 'text-blue-500' : ''}
+                          ${isTodayDate && day.isCurrentMonth ? 'ring-2 ring-blue-400' : ''}
+                          ${isSelected ? 'bg-slate-700 text-white font-bold' : ''}
+                          ${!isSelected && hasItems && day.isCurrentMonth ? 'bg-green-50 hover:bg-green-100 font-semibold' : ''}
+                          ${!hasItems || !day.isCurrentMonth ? 'cursor-default' : 'cursor-pointer'}
+                        `}
+                      >
+                        <div className="flex flex-col items-center justify-center">
+                          <span>{day.date.getDate()}</span>
+                          {hasItems && day.isCurrentMonth && (
+                            <div className={`absolute bottom-1 flex gap-0.5`}>
+                              {count <= 3 ? (
+                                Array.from({ length: count }).map((_, i) => (
+                                  <div
+                                    key={i}
+                                    className={`w-1 h-1 rounded-full ${
+                                      isSelected ? 'bg-white' : 'bg-green-600'
+                                    }`}
+                                  />
+                                ))
+                              ) : (
+                                <span className={`text-[8px] font-bold ${isSelected ? 'text-white' : 'text-green-600'}`}>
+                                  {count}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+
+            {/* 범례 */}
+            <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-center gap-4 text-xs text-slate-600">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded bg-green-50 border border-green-200"></div>
+                <span>항목 있음</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded ring-2 ring-blue-400"></div>
+                <span>오늘</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 상세 정보 모달 */}
       {detailModalItem && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4">
@@ -933,7 +1439,7 @@ export default function App() {
             <div className="flex justify-between items-start mb-4">
               <div className="flex-1">
                 <h2 className="text-xl font-bold text-slate-800 mb-2">{detailModalItem.text}</h2>
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex gap-2 flex-wrap items-center mb-2">
                   {(detailModalItem.categories || ['기타']).map((cat, idx) => (
                     <span
                       key={idx}
@@ -943,6 +1449,10 @@ export default function App() {
                       {cat}
                     </span>
                   ))}
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <Clock size={12} />
+                  <span>{formatDateTime(detailModalItem.createdAt)}</span>
                 </div>
               </div>
               <div className="flex items-center gap-2 ml-4">
@@ -1130,13 +1640,73 @@ export default function App() {
               </button>
             </div>
 
+            {/* 정렬 옵션 */}
+            <div className="mb-4 pb-4 border-b border-slate-200">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">정렬 순서</label>
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={() => setTagSortOrder('usage')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    tagSortOrder === 'usage'
+                      ? 'bg-slate-700 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  사용 빈도순
+                </button>
+                <button
+                  onClick={() => setTagSortOrder('recent')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    tagSortOrder === 'recent'
+                      ? 'bg-slate-700 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  최근 사용순
+                </button>
+                <button
+                  onClick={() => setTagSortOrder('alphabetical')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    tagSortOrder === 'alphabetical'
+                      ? 'bg-slate-700 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  가나다순
+                </button>
+                <button
+                  onClick={() => {
+                    setTagSortOrder('custom');
+                    setCustomTagOrder([...sortedCategories]);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    tagSortOrder === 'custom'
+                      ? 'bg-slate-700 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  수동 정렬
+                </button>
+              </div>
+              {tagSortOrder === 'custom' && (
+                <p className="text-xs text-slate-500 mt-2">드래그하여 순서를 변경하세요</p>
+              )}
+            </div>
+
             <div className="flex-1 overflow-y-auto space-y-2 mb-4">
-              {categories.map(cat => {
+              {sortedCategories.map((cat, index) => {
                 const bgColor = getHashtagColor(cat, tagColors);
                 const isEditing = editingTag === cat;
 
                 return (
-                  <div key={cat} className="flex items-center gap-2">
+                  <div
+                    key={cat}
+                    className={`flex items-center gap-2 ${tagSortOrder === 'custom' ? 'cursor-move' : ''} ${draggedTagIndex === index ? 'opacity-50' : ''}`}
+                    draggable={tagSortOrder === 'custom' && !isEditing}
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDragEnd={handleDragEnd}
+                  >
                     {isEditing ? (
                       <>
                         <input
@@ -1219,9 +1789,9 @@ export default function App() {
 
           <div className="flex-1 overflow-y-auto p-4 space-y-6">
             <div className="space-y-1">
-              <button onClick={() => setFilterStatus('all')} className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm ${filterStatus === 'all' ? 'bg-[#D4E4F1] text-slate-700' : 'text-slate-600 hover:bg-slate-300/20'}`}><LayoutGrid size={16} /> 전체 보기</button>
-              <button onClick={() => setFilterStatus('unsolved')} className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm ${filterStatus === 'unsolved' ? 'bg-[#F5EBC8] text-slate-700' : 'text-slate-600 hover:bg-slate-300/20'}`}><Circle size={16} className="text-slate-500" /> 미해결</button>
-              <button onClick={() => setFilterStatus('solved')} className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm ${filterStatus === 'solved' ? 'bg-[#CAD3C0] text-slate-700' : 'text-slate-600 hover:bg-slate-300/20'}`}><CheckCircle2 size={16} className="text-slate-500" /> 해결됨</button>
+              <button onClick={() => setStatusFilter('all')} className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm ${statusFilter === 'all' ? 'bg-[#D4E4F1] text-slate-700' : 'text-slate-600 hover:bg-slate-300/20'}`}><LayoutGrid size={16} /> 전체 보기</button>
+              <button onClick={() => setStatusFilter('unsolved')} className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm ${statusFilter === 'unsolved' ? 'bg-[#F5EBC8] text-slate-700' : 'text-slate-600 hover:bg-slate-300/20'}`}><Circle size={16} className="text-slate-500" /> 미해결</button>
+              <button onClick={() => setStatusFilter('solved')} className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm ${statusFilter === 'solved' ? 'bg-[#CAD3C0] text-slate-700' : 'text-slate-600 hover:bg-slate-300/20'}`}><CheckCircle2 size={16} className="text-slate-500" /> 해결됨</button>
             </div>
 
             <div className="space-y-2">
@@ -1230,9 +1800,9 @@ export default function App() {
                 <button onClick={() => setShowTagManager(true)} className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1 transition-colors"><Edit2 size={12} /> 추가/편집</button>
               </div>
               <div className="flex flex-wrap gap-2 px-1">
-                <button onClick={() => setFilterCategory('all')} className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${filterCategory === 'all' ? 'ring-2 ring-slate-400' : ''}`} style={{ backgroundColor: '#D5D5D7' }}>전체</button>
-                {categories.map(cat => (
-                  <button key={cat} onClick={() => setFilterCategory(cat)} className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${filterCategory === cat ? 'ring-2 ring-slate-400' : ''}`} style={{ backgroundColor: getHashtagColor(cat, tagColors) }}>{cat}</button>
+                <button onClick={() => setSelectedTags([])} className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${selectedTags.length === 0 ? 'ring-2 ring-slate-400' : ''}`} style={{ backgroundColor: '#D5D5D7' }}>전체</button>
+                {sortedCategories.map(cat => (
+                  <button key={cat} onClick={() => setSelectedTags([cat])} className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${selectedTags.includes(cat) ? 'ring-2 ring-slate-400' : ''}`} style={{ backgroundColor: getHashtagColor(cat, tagColors) }}>{cat}</button>
                 ))}
               </div>
 
@@ -1246,6 +1816,206 @@ export default function App() {
                     <Sparkles size={14} />
                     AI 자동 분류 ({uncategorizedCount}개)
                   </button>
+                </div>
+              )}
+            </div>
+
+            {/* 활동 히트맵 */}
+            <div className="space-y-2 border-t border-slate-300/50 pt-4 mt-4">
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1">Activity</h3>
+              <div className="px-1">
+                <div className="bg-white/30 rounded-lg p-3">
+                  <div className="flex flex-col gap-1">
+                    {Array.from({ length: 7 }).map((_, dayIndex) => (
+                      <div key={dayIndex} className="flex gap-1">
+                        {contributionData
+                          .filter((_, index) => index % 7 === dayIndex)
+                          .map((day, weekIndex) => (
+                            <div
+                              key={`${dayIndex}-${weekIndex}`}
+                              className="w-2.5 h-2.5 rounded-sm transition-all hover:ring-1 hover:ring-slate-400 cursor-pointer"
+                              style={{ backgroundColor: getColorForLevel(day.level) }}
+                              title={`${day.date}: ${day.count}개 작성`}
+                            />
+                          ))}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between mt-3 text-[10px] text-slate-400">
+                    <span>12주 전</span>
+                    <div className="flex items-center gap-1">
+                      <span>적음</span>
+                      {[0, 1, 2, 3, 4].map(level => (
+                        <div
+                          key={level}
+                          className="w-2.5 h-2.5 rounded-sm"
+                          style={{ backgroundColor: getColorForLevel(level) }}
+                        />
+                      ))}
+                      <span>많음</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 통계 섹션 */}
+            <div className="space-y-3 border-t border-slate-300/50 pt-4 mt-4">
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1 flex items-center gap-1">
+                <BarChart3 size={12} />
+                Statistics
+              </h3>
+
+              {/* 일주일 통계 - 막대 그래프 */}
+              {weeklyStats.length > 0 && (
+                <div className="px-1">
+                  <div className="bg-white/30 rounded-lg p-3">
+                    <div className="flex items-center gap-1 mb-3">
+                      <TrendingUp size={12} className="text-blue-500" />
+                      <h4 className="text-xs font-semibold text-slate-700">지난 일주일</h4>
+                    </div>
+                    <div className="space-y-2.5">
+                      {weeklyStats.map(([category, count], index) => {
+                        const maxCount = weeklyStats[0][1];
+                        const percentage = (count / maxCount) * 100;
+
+                        return (
+                          <button
+                            key={category}
+                            onClick={() => {
+                              setSelectedTags([category]);
+                              setSidebarOpen(false);
+                            }}
+                            className="w-full text-left group"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                <span className="text-[10px] text-slate-400 font-mono">{index + 1}</span>
+                                <span
+                                  className="px-1.5 py-0.5 rounded text-[10px] font-medium truncate"
+                                  style={{ backgroundColor: getHashtagColor(category, tagColors) }}
+                                >
+                                  {category}
+                                </span>
+                              </div>
+                              <span className="text-xs font-bold text-slate-700">{count}</span>
+                            </div>
+                            <div className="w-full bg-slate-200/50 rounded-full h-2 overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all duration-500 group-hover:opacity-80"
+                                style={{
+                                  width: `${percentage}%`,
+                                  backgroundColor: getHashtagColor(category, tagColors)
+                                }}
+                              />
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 한 달 통계 - 막대 그래프 */}
+              {monthlyStats.length > 0 && (
+                <div className="px-1">
+                  <div className="bg-white/30 rounded-lg p-3">
+                    <div className="flex items-center gap-1 mb-3">
+                      <TrendingUp size={12} className="text-green-500" />
+                      <h4 className="text-xs font-semibold text-slate-700">지난 한 달</h4>
+                    </div>
+                    <div className="space-y-2.5">
+                      {monthlyStats.map(([category, count], index) => {
+                        const maxCount = monthlyStats[0][1];
+                        const percentage = (count / maxCount) * 100;
+
+                        return (
+                          <button
+                            key={category}
+                            onClick={() => {
+                              setSelectedTags([category]);
+                              setSidebarOpen(false);
+                            }}
+                            className="w-full text-left group"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                <span className="text-[10px] text-slate-400 font-mono">{index + 1}</span>
+                                <span
+                                  className="px-1.5 py-0.5 rounded text-[10px] font-medium truncate"
+                                  style={{ backgroundColor: getHashtagColor(category, tagColors) }}
+                                >
+                                  {category}
+                                </span>
+                              </div>
+                              <span className="text-xs font-bold text-slate-700">{count}</span>
+                            </div>
+                            <div className="w-full bg-slate-200/50 rounded-full h-2 overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all duration-500 group-hover:opacity-80"
+                                style={{
+                                  width: `${percentage}%`,
+                                  backgroundColor: getHashtagColor(category, tagColors)
+                                }}
+                              />
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 1년 통계 - 막대 그래프 */}
+              {yearlyStats.length > 0 && (
+                <div className="px-1">
+                  <div className="bg-white/30 rounded-lg p-3">
+                    <div className="flex items-center gap-1 mb-3">
+                      <TrendingUp size={12} className="text-purple-500" />
+                      <h4 className="text-xs font-semibold text-slate-700">지난 1년</h4>
+                    </div>
+                    <div className="space-y-2.5">
+                      {yearlyStats.map(([category, count], index) => {
+                        const maxCount = yearlyStats[0][1];
+                        const percentage = (count / maxCount) * 100;
+
+                        return (
+                          <button
+                            key={category}
+                            onClick={() => {
+                              setSelectedTags([category]);
+                              setSidebarOpen(false);
+                            }}
+                            className="w-full text-left group"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                <span className="text-[10px] text-slate-400 font-mono">{index + 1}</span>
+                                <span
+                                  className="px-1.5 py-0.5 rounded text-[10px] font-medium truncate"
+                                  style={{ backgroundColor: getHashtagColor(category, tagColors) }}
+                                >
+                                  {category}
+                                </span>
+                              </div>
+                              <span className="text-xs font-bold text-slate-700">{count}</span>
+                            </div>
+                            <div className="w-full bg-slate-200/50 rounded-full h-2 overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all duration-500 group-hover:opacity-80"
+                                style={{
+                                  width: `${percentage}%`,
+                                  backgroundColor: getHashtagColor(category, tagColors)
+                                }}
+                              />
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -1304,27 +2074,180 @@ export default function App() {
               </div>
             </div>
 
+            {/* Filter Bar */}
+            <div className="px-4 md:px-8 py-4 bg-[#F0EFEB] border-b border-slate-300/50">
+              <div className="max-w-3xl mx-auto space-y-3">
+                {/* 검색 바 */}
+                <div className="relative">
+                  <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="질문 또는 설명에서 검색..."
+                    className="w-full pl-10 pr-4 py-2 bg-white/50 border border-slate-300/50 rounded-lg text-sm focus:outline-none focus:border-slate-400 focus:bg-white transition-all"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+
+                {/* 필터 옵션들 */}
+                <div className="flex flex-wrap gap-2 items-center">
+                  {/* 상태 필터 */}
+                  <div className="flex items-center gap-1 bg-white/50 rounded-lg p-1 border border-slate-300/50">
+                    <button
+                      onClick={() => setStatusFilter('all')}
+                      className={`px-3 py-1 rounded text-xs font-medium transition-all ${statusFilter === 'all' ? 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-200/50'}`}
+                    >
+                      전체
+                    </button>
+                    <button
+                      onClick={() => setStatusFilter('unsolved')}
+                      className={`px-3 py-1 rounded text-xs font-medium transition-all flex items-center gap-1 ${statusFilter === 'unsolved' ? 'bg-yellow-500 text-white' : 'text-slate-600 hover:bg-slate-200/50'}`}
+                    >
+                      <Circle size={12} />
+                      미해결
+                    </button>
+                    <button
+                      onClick={() => setStatusFilter('solved')}
+                      className={`px-3 py-1 rounded text-xs font-medium transition-all flex items-center gap-1 ${statusFilter === 'solved' ? 'bg-green-600 text-white' : 'text-slate-600 hover:bg-slate-200/50'}`}
+                    >
+                      <CheckCircle2 size={12} />
+                      해결됨
+                    </button>
+                  </div>
+
+                  {/* 그룹핑 옵션 */}
+                  <div className="flex items-center gap-1 bg-white/50 rounded-lg p-1 border border-slate-300/50">
+                    <button
+                      onClick={() => setGroupBy('none')}
+                      className={`px-3 py-1 rounded text-xs font-medium transition-all flex items-center gap-1 ${groupBy === 'none' ? 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-200/50'}`}
+                    >
+                      <LayoutGrid size={12} />
+                      기본
+                    </button>
+                    <button
+                      onClick={() => setGroupBy('date')}
+                      className={`px-3 py-1 rounded text-xs font-medium transition-all flex items-center gap-1 ${groupBy === 'date' ? 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-200/50'}`}
+                    >
+                      <Calendar size={12} />
+                      날짜별
+                    </button>
+                    <button
+                      onClick={() => setGroupBy('status')}
+                      className={`px-3 py-1 rounded text-xs font-medium transition-all flex items-center gap-1 ${groupBy === 'status' ? 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-200/50'}`}
+                    >
+                      <Filter size={12} />
+                      상태별
+                    </button>
+                  </div>
+
+                  {/* 날짜 선택 버튼 */}
+                  <button
+                    onClick={() => setShowDatePicker(true)}
+                    className={`flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium transition-all border ${
+                      selectedDate
+                        ? 'bg-slate-700 text-white border-slate-700'
+                        : 'bg-white/50 text-slate-600 border-slate-300/50 hover:bg-slate-200/50'
+                    }`}
+                  >
+                    <Calendar size={12} />
+                    {selectedDate || '날짜 선택'}
+                  </button>
+
+                  {/* 결과 수 */}
+                  <span className="text-xs text-slate-500 ml-auto">
+                    {filteredItems.length}개 항목
+                  </span>
+                </div>
+
+                {/* 태그 필터 칩 */}
+                {categories.length > 0 && (
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <Tag size={14} className="text-slate-400" />
+                    {sortedCategories.map(tag => (
+                      <button
+                        key={tag}
+                        onClick={() => toggleTag(tag)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                          selectedTags.includes(tag)
+                            ? 'ring-2 ring-slate-700 shadow-sm'
+                            : 'opacity-60 hover:opacity-100'
+                        }`}
+                        style={{ backgroundColor: getHashtagColor(tag, tagColors) }}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                    {selectedTags.length > 0 && (
+                      <button
+                        onClick={() => setSelectedTags([])}
+                        className="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-200/50 transition-all"
+                      >
+                        <X size={12} className="inline mr-1" />
+                        초기화
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Item List */}
             <div className="px-4 md:px-8 py-6 bg-[#F0EFEB] min-h-screen">
               {filteredItems.length === 0 ? (
                 <div className="flex flex-col items-center justify-center min-h-[60vh] opacity-40">
-                  <Plus size={48} className="text-slate-400 mb-4" />
-                  <h2 className="text-2xl font-bold text-slate-400">첫 궁금증을 등록해보세요</h2>
-                  <p className="text-slate-400 mt-2">위 입력창에 입력 후 Enter를 누르세요</p>
+                  {items.length === 0 ? (
+                    <>
+                      <Plus size={48} className="text-slate-400 mb-4" />
+                      <h2 className="text-2xl font-bold text-slate-400">첫 궁금증을 등록해보세요</h2>
+                      <p className="text-slate-400 mt-2">위 입력창에 입력 후 Enter를 누르세요</p>
+                    </>
+                  ) : (
+                    <>
+                      <Search size={48} className="text-slate-400 mb-4" />
+                      <h2 className="text-2xl font-bold text-slate-400">검색 결과가 없습니다</h2>
+                      <p className="text-slate-400 mt-2">다른 검색어나 필터를 시도해보세요</p>
+                    </>
+                  )}
                 </div>
               ) : (
-                <div className="max-w-3xl mx-auto space-y-4 pb-20">
-                  {filteredItems.map(item => (
-                    <div key={item.id} onClick={() => handleItemClick(item)} title="클릭하여 상세 정보 보기" className={`bg-white/50 p-5 rounded-xl border transition-all cursor-pointer hover:shadow-md ${item.status === 'solved' ? 'border-[#CAD3C0]' : 'border-slate-300/50'} ${item.id === newlyAddedId ? 'animate-sink-in' : ''}`}>
+                <div className="max-w-3xl mx-auto space-y-6 pb-20">
+                  {groupedItems().map(([groupName, groupItems]) => (
+                    <div key={groupName}>
+                      {groupBy !== 'none' && (
+                        <h3 className="text-lg font-bold text-slate-700 mb-3 flex items-center gap-2">
+                          {groupBy === 'date' && <Calendar size={18} />}
+                          {groupBy === 'status' && (groupName === '미해결' ? <Circle size={18} /> : <CheckCircle2 size={18} />)}
+                          {groupName}
+                          <span className="text-sm font-normal text-slate-400">({groupItems.length})</span>
+                        </h3>
+                      )}
+                      <div className="space-y-4">
+                        {groupItems.map(item => (
+                    <div key={item.id} onClick={() => handleItemClick(item)} title="클릭하여 상세 정보 보기" className={`p-5 rounded-xl border transition-all cursor-pointer hover:shadow-md ${item.status === 'solved' ? 'bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200' : 'bg-white/50 border-slate-300/50'} ${item.id === newlyAddedId ? 'animate-sink-in' : ''}`}>
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex gap-2 flex-wrap">
                           {(item.categories || (item.category ? [item.category] : ['기타'])).map((cat, idx) => (
                             <span key={idx} className="px-2.5 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: getHashtagColor(cat, tagColors) }}>{cat}</span>
                           ))}
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); toggleStatus(item.id, item.status); }} className={`${item.status === 'solved' ? 'text-[#CAD3C0]' : 'text-slate-300 hover:text-slate-500'}`}>{item.status === 'solved' ? <CheckCircle2 size={20} /> : <Circle size={20} />}</button>
+                        <button onClick={(e) => { e.stopPropagation(); toggleStatus(item.id, item.status); }} className={`transition-all ${item.status === 'solved' ? 'text-yellow-500 hover:text-yellow-600' : 'text-slate-300 hover:text-slate-500'}`}>
+                          {item.status === 'solved' ? <Lightbulb size={20} className="fill-yellow-500" /> : <Circle size={20} />}
+                        </button>
                       </div>
-                      <h3 className={`font-medium text-slate-800 mb-3 ${item.status === 'solved' && 'line-through text-slate-400'}`}>{item.text}</h3>
+                      <div className="flex items-start gap-2 mb-3">
+                        {item.status === 'solved' && (
+                          <Lightbulb size={18} className="text-yellow-500 fill-yellow-500 flex-shrink-0 mt-0.5" />
+                        )}
+                        <h3 className="font-medium text-slate-800 flex-1">{item.text}</h3>
+                      </div>
 
                       {item.description && (
                         <div className="text-sm text-slate-600 mb-3 line-clamp-2">
@@ -1353,6 +2276,9 @@ export default function App() {
                           <span className="text-[10px]">{item.createdAt && new Date(item.createdAt).toLocaleDateString()}</span>
                         </div>
                         <button onClick={(e) => deleteItem(item.id, e)} className="text-slate-300 hover:text-red-400"><Trash2 size={16} /></button>
+                      </div>
+                    </div>
+                        ))}
                       </div>
                     </div>
                   ))}
