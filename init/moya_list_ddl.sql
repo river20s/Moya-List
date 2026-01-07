@@ -52,6 +52,16 @@ CREATE TABLE `question_tags` (
 	PRIMARY KEY (`question_id`, `tag_id`)
 );
 
+CREATE TABLE `guest_questions` (
+	`id` BIGINT NOT NULL AUTO_INCREMENT,
+	`session_id` VARCHAR(255) NOT NULL,
+	`title` VARCHAR(500) NOT NULL,
+	`source_url` VARCHAR(1000) NULL,
+	`created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (`id`),
+	INDEX `IDX_session_id` (`session_id`)
+);
+
 -- 외래키 제약조건
 ALTER TABLE `questions` 
 	ADD CONSTRAINT `FK_questions_user` 
