@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: moya-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root1234
+      MYSQL_DATABASE: moya_list
+      MYSQL_USER: moya
+      MYSQL_PASSWORD: moya1234
+    ports:
+      - "3306:3306"
+    volumes:
+      - moya-mysql-data:/var/lib/mysql
+      - ./init:/docker-entrypoint-initdb.d
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+
+  redis:
+    image: redis:7-alpine
+    container_name: moya-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - moya-redis-data:/data
+
+volumes:
+  moya-mysql-data:
+  moya-redis-data:
