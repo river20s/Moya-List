@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/moya_list?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
+    username: moya
+    password: moya1234
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+  security:
+    user:
+      name: admin
+      password: admin
+
+server:
+  port: 8080
