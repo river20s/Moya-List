@@ -8,6 +8,8 @@ import java.time.LocalDateTime;
 @Table(name = "questions")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
+@Builder
 public class Question {
 
     @Id
@@ -27,6 +29,7 @@ public class Question {
     @Column(name = "source_url", length = 1000)
     private String sourceUrl;
 
+    @Builder.Default
     @Column(name = "is_resolved", nullable = false)
     private Boolean isResolved = false;
 

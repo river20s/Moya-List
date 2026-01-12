@@ -3,12 +3,10 @@ package com.moyalist.backend.controller;
 import com.moyalist.backend.entity.Question;
 import com.moyalist.backend.service.QuestionService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/questions")
@@ -25,5 +23,20 @@ public class QuestionController {
     @GetMapping("/{id}")
     public Question getQuestion(@PathVariable Long id) {
         return questionService.getQuestion(id);
+    }
+
+    @PostMapping
+    public Question createQuestion(@RequestBody Map<String, String> request) {
+        Long userId = Long.parseLong(request.get("userId"));
+        String title = request.get("title");
+        String sourceUrl = request.get("sourceUrl");
+        String description = request.get("description");
+
+        return questionService.createQuestion(userId, title, sourceUrl, description);
+    }
+
+    @DeleteMapping("/{id}")
+    public void deleteQuestion(@PathVariable Long id) {
+        questionService.deleteQuestion(id);
     }
 }
