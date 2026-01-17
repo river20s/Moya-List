@@ -1,5 +1,7 @@
 package com.moyalist.backend.service;
 
+import com.moyalist.backend.dto.QuestionRequestDto;
+import com.moyalist.backend.dto.QuestionResponseDto;
 import com.moyalist.backend.entity.Question;
 import com.moyalist.backend.entity.User;
 import com.moyalist.backend.repository.QuestionRepository;
@@ -9,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -18,33 +21,32 @@ public class QuestionService {
     private final QuestionRepository questionRepository;
     private final UserRepository userRepository;
 
-    public List<Question> getQuestionsByUser(Long userId) {
-        return questionRepository.findByUserIdOrderByCreatedAtDesc(userId);
-    }
-
-    public Question getQuestion(Long id) {
-        return questionRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("질문을 찾을 수 없습니다: " + id));
-    }
-
     @Transactional
-    public Question createQuestion(Long userId, String title, String sourceUrl, String description) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
+    public QuestionResponseDto createQuestion(QuestionRequestDto request) {
+        User user = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + request.getUserId()));
 
         Question question = Question.builder()
                 .user(user)
-                .title(title)
-                .sourceUrl(sourceUrl)
-                .description(description)
+                .title(request.getTitle())
+                .sourceUrl(request.getSourceUrl())
+                .description(request.getDescription())
                 .isResolved(false)
                 .build();
 
-        return questionRepository.save(question);
+        Question saved = questionRepository.save(question);
+        return QuestionResponseDto.from(saved);
     }
 
-    @Transactional
-    public void deleteQuestion(Long id) {
-        questionRepository.deleteById(id);
+    public List<QuestionResponseDto> getAllQuestions() {
+        return questionRepository.findAll().stream()
+                .map(QuestionResponseDto::from)
+                .collect(Collectors.toList());
+    }
+
+    public QuestionResponseDto getQuestion(Long id) {
+        Question question = questionRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("질문을 찾을 수 없습니다: " + id));
+        return QuestionResponseDto.from(question);
     }
 }

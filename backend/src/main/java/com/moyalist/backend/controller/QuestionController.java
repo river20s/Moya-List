@@ -1,12 +1,14 @@
 package com.moyalist.backend.controller;
 
-import com.moyalist.backend.entity.Question;
+import com.moyalist.backend.dto.QuestionRequestDto;
+import com.moyalist.backend.dto.QuestionResponseDto;
 import com.moyalist.backend.service.QuestionService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/questions")
@@ -15,28 +17,19 @@ public class QuestionController {
 
     private final QuestionService questionService;
 
-    @GetMapping("/user/{userId}")
-    public List<Question> getQuestionsByUser(@PathVariable Long userId) {
-        return questionService.getQuestionsByUser(userId);
+    @PostMapping
+    public ResponseEntity<QuestionResponseDto> createQuestion(@Valid @RequestBody QuestionRequestDto request) {
+        QuestionResponseDto response = questionService.createQuestion(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping
+    public ResponseEntity<List<QuestionResponseDto>> getAllQuestions() {
+        return ResponseEntity.ok(questionService.getAllQuestions());
     }
 
     @GetMapping("/{id}")
-    public Question getQuestion(@PathVariable Long id) {
-        return questionService.getQuestion(id);
-    }
-
-    @PostMapping
-    public Question createQuestion(@RequestBody Map<String, String> request) {
-        Long userId = Long.parseLong(request.get("userId"));
-        String title = request.get("title");
-        String sourceUrl = request.get("sourceUrl");
-        String description = request.get("description");
-
-        return questionService.createQuestion(userId, title, sourceUrl, description);
-    }
-
-    @DeleteMapping("/{id}")
-    public void deleteQuestion(@PathVariable Long id) {
-        questionService.deleteQuestion(id);
+    public ResponseEntity<QuestionResponseDto> getQuestion(@PathVariable Long id) {
+        return ResponseEntity.ok(questionService.getQuestion(id));
     }
 }
