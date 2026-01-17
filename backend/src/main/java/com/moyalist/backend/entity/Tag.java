@@ -22,7 +22,7 @@ public class Tag {
     private String name;
 
     @Column(length = 20, nullable = false)
-    private String color = "#6B7280";
+    private String color;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -30,5 +30,15 @@ public class Tag {
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        if (color == null) {
+            color = "#6B7280";
+        }
+    }
+
+    @Builder
+    public Tag(User user, String name, String color) {
+        this.user = user;
+        this.name = name;
+        this.color = color != null ? color : "#6B7280";
     }
 }
