@@ -40,4 +40,11 @@ public class Question {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
     }
+
+    // update 메서드
+    public void update(String title, String sourceUrl, String description) {
+        this.title = title;
+        this.sourceUrl = sourceUrl;
+        this.description = description;
+    }
 }

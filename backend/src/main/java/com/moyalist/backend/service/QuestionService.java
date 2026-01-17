@@ -49,4 +49,19 @@ public class QuestionService {
                 .orElseThrow(() -> new IllegalArgumentException("질문을 찾을 수 없습니다: " + id));
         return QuestionResponseDto.from(question);
     }
+    @Transactional
+    public QuestionResponseDto updateQuestion(Long id, QuestionRequestDto request) {
+        Question question = questionRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("질문을 찾을 수 없습니다: " + id));
+
+        question.update(request.getTitle(), request.getSourceUrl(), request.getDescription());
+        return QuestionResponseDto.from(question);
+    }
+
+    @Transactional
+    public void deleteQuestion(Long id) {
+        Question question = questionRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("질문을 찾을 수 없습니다: " + id));
+        questionRepository.delete(question);
+    }
 }
