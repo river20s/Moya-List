@@ -3,6 +3,8 @@ package com.moyalist.backend.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "questions")
@@ -36,6 +38,10 @@ public class Question {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Builder.Default
+    @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<QuestionTag> questionTags = new ArrayList<>();
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -46,5 +52,11 @@ public class Question {
         this.title = title;
         this.sourceUrl = sourceUrl;
         this.description = description;
+    }
+
+    //태그 추가 메서드
+    public void addTag(Tag tag) {
+        QuestionTag questionTag = new QuestionTag(this, tag);
+        this.questionTags.add(questionTag);
     }
 }

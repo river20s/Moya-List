@@ -21,4 +21,10 @@ public class QuestionTag {
     @MapsId("tagId")
     @JoinColumn(name = "tag_id")
     private Tag tag;
+
+    public QuestionTag(Question question, Tag tag) {
+        this.id = new QuestionTagId(question.getId(), tag.getId());
+        this.question = question;
+        this.tag = tag;
+    }
 }

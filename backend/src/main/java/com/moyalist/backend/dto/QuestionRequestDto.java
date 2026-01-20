@@ -5,11 +5,13 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Getter
 @NoArgsConstructor
 public class QuestionRequestDto {
 
-    @NotNull(message = "userId는 필수입니다")
+    @NotNull(message = "사용자 Id는 필수입니다")
     private Long userId;
 
     @NotBlank(message = "제목은 필수입니다")
@@ -18,4 +20,6 @@ public class QuestionRequestDto {
     private String sourceUrl;
 
     private String description;
+
+    private List<Long> tagIds;
 }

@@ -6,7 +6,7 @@ import java.io.Serializable;
 
 @Embeddable
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor(access = AccessLevel.PUBLIC)
 @AllArgsConstructor
 @EqualsAndHashCode
 public class QuestionTagId implements Serializable {

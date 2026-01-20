@@ -5,7 +5,9 @@ import com.moyalist.backend.dto.QuestionResponseDto;
 import com.moyalist.backend.entity.Question;
 import com.moyalist.backend.entity.User;
 import com.moyalist.backend.repository.QuestionRepository;
+import com.moyalist.backend.repository.TagRepository;
 import com.moyalist.backend.repository.UserRepository;
+import com.moyalist.backend.entity.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,7 @@ public class QuestionService {
 
     private final QuestionRepository questionRepository;
     private final UserRepository userRepository;
+    private final TagRepository tagRepository;
 
     @Transactional
     public QuestionResponseDto createQuestion(QuestionRequestDto request) {
@@ -33,6 +36,14 @@ public class QuestionService {
                 .description(request.getDescription())
                 .isResolved(false)
                 .build();
+
+        if (request.getTagIds() != null && !request.getTagIds().isEmpty()) {
+            for (Long tagId : request.getTagIds()) {
+                Tag tag = tagRepository.findById(tagId)
+                        .orElseThrow(() -> new IllegalArgumentException("태그를 찾을 수 없습니다: " + tagId));
+                question.addTag(tag);
+            }
+        }
 
         Question saved = questionRepository.save(question);
         return QuestionResponseDto.from(saved);
