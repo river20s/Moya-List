@@ -1,0 +1,87 @@
+name: Auto Milestone
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  set-milestone:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    
+    steps:
+      - name: Set milestone for issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // 3일 후 날짜 계산
+            const targetDate = new Date();
+            targetDate.setDate(targetDate.getDate() + 3);
+            
+            const year = targetDate.getFullYear();
+            const month = targetDate.getMonth() + 1;
+            
+            // 해당 월의 1일
+            const firstDay = new Date(year, month - 1, 1);
+            
+            // 1일이 속한 주의 일요일 찾기 (일요일 시작 기준)
+            const firstSunday = new Date(firstDay);
+            firstSunday.setDate(firstDay.getDate() - firstDay.getDay());
+            
+            // 타겟 날짜가 몇 주차인지 계산
+            const diffDays = Math.floor((targetDate - firstSunday) / (1000 * 60 * 60 * 24));
+            const weekNum = Math.floor(diffDays / 7) + 1;
+            
+            const milestoneName = `${month}월 ${weekNum}주차`;
+            console.log(`Target milestone: ${milestoneName}`);
+            
+            // 기존 마일스톤 조회
+            const milestones = await github.rest.issues.listMilestones({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'all'
+            });
+            
+            // 지난 마일스톤 닫기
+            const now = new Date();
+            for (const m of milestones.data) {
+              if (m.due_on && new Date(m.due_on) < now && m.state === 'open') {
+                await github.rest.issues.updateMilestone({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  milestone_number: m.number,
+                  state: 'closed'
+                });
+                console.log(`Closed past milestone: ${m.title}`);
+              }
+            }
+            
+            // 타겟 마일스톤 찾기 또는 생성
+            let milestone = milestones.data.find(m => m.title === milestoneName);
+            
+            if (!milestone) {
+              // 마일스톤 마감일 계산 (해당 주 토요일)
+              const weekStart = new Date(firstSunday);
+              weekStart.setDate(firstSunday.getDate() + (weekNum - 1) * 7);
+              const weekEnd = new Date(weekStart);
+              weekEnd.setDate(weekStart.getDate() + 6);
+              
+              const created = await github.rest.issues.createMilestone({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: milestoneName,
+                due_on: weekEnd.toISOString()
+              });
+              milestone = created.data;
+              console.log(`Created milestone: ${milestoneName}`);
+            }
+            
+            // 이슈에 마일스톤 설정
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              milestone: milestone.number
+            });
+            console.log(`Set milestone ${milestoneName} to issue #${context.issue.number}`);
