@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh issue view:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(winget install:*)",
+      "Bash(gh:*)",
+      "Bash(\"C:\\Program Files\\GitHub CLI\\gh.exe\" --version)",
+      "Bash(\"C:\\Program Files\\GitHub CLI\\gh.exe\" issue view 10)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
