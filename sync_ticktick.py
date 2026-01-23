@@ -1,4 +1,5 @@
 import os
+from ticktick.oauth2 import OAuth2
 from ticktick.api import TickTickClient
 
 # 환경 변수 로드
@@ -8,7 +9,8 @@ username = os.getenv('TICKTICK_USERNAME')
 password = os.getenv('TICKTICK_PASSWORD')
 
 # TickTick 로그인
-client = TickTickClient(client_id, client_secret, username, password)
+auth_client = OAuth2(client_id=client_id, client_secret=client_secret, redirect_uri="http://localhost")
+client = TickTickClient(username, password, auth_client)
 
 # 1. 'Moya List' 찾기 (없으면 Inbox 사용)
 project_name = "Moya List"
