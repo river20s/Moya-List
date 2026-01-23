@@ -142,3 +142,6 @@ vite.config.ts.timestamp-*
 tmpclaude-*-cwd
 **/.claude/settings.local.json
 nul
+
+# IntelliJ IDEA
+.idea/

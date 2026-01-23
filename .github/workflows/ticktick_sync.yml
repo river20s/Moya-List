@@ -1,0 +1,35 @@
+name: Sync GitHub Issues to TickTick
+
+on:
+  issues:
+    types: [opened, closed]
+  workflow_dispatch: # 이 부분이 있으면 깃허브 웹에서 수동 실행 버튼이 생깁니다.
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install ticktick-py requests
+
+      - name: Run sync script
+        env:
+          TICKTICK_CLIENT_ID: ${{ secrets.TICKTICK_CLIENT_ID }}
+          TICKTICK_CLIENT_SECRET: ${{ secrets.TICKTICK_CLIENT_SECRET }}
+          TICKTICK_USERNAME: ${{ secrets.TICKTICK_USERNAME }}
+          TICKTICK_PASSWORD: ${{ secrets.TICKTICK_PASSWORD }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 깃허브가 자동으로 제공하는 토큰
+          ACTION_TYPE: ${{ github.event.action || 'bulk_sync' }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+        run: python sync_ticktick.py
