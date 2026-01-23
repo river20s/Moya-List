@@ -76,6 +76,12 @@ public class QuestionController {
         return ResponseEntity.ok(questionService.getQuestion(id));
     }
 
+    @PatchMapping("/{id}/resolve")
+    public ResponseEntity<QuestionResponseDto> toggleResolveStatus(@PathVariable Long id) {
+        return ResponseEntity.ok(questionService.toggleResolve(id));
+    }
+
+
     @PutMapping("/{id}")
     public ResponseEntity<QuestionResponseDto> updateQuestion(
             @PathVariable Long id,

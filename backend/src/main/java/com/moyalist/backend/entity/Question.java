@@ -54,6 +54,11 @@ public class Question {
         this.description = description;
     }
 
+    // isResolved 값을 반전시키는 메서드
+    public void toggleResolved() {
+        this.isResolved = !this.isResolved;
+    }
+
     //태그 추가 메서드
     public void addTag(Tag tag) {
         QuestionTag questionTag = new QuestionTag(this, tag);

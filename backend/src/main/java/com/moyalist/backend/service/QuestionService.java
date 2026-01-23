@@ -73,6 +73,15 @@ public class QuestionService {
         return QuestionResponseDto.from(question);
     }
 
+    @Transactional // DB 데이터 변경 작업
+    public QuestionResponseDto toggleResolve(Long id) {
+        // ID로 Question 찾기
+        Question question = questionRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("질문을 찾을 수 없습니다: " + id));
+        question.toggleResolved(); // isResolved 값 반전
+        return QuestionResponseDto.from(question); // DTO로 변환해서 반환
+    }
+
     @Transactional
     public void deleteQuestion(Long id) {
         Question question = questionRepository.findById(id)
