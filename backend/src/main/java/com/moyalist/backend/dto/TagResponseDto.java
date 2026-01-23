@@ -20,12 +20,18 @@ public class TagResponseDto {
     private Long id;
     private String name;
     private String color;
+    private Long questionCount;
 
     public static TagResponseDto from(Tag tag) {
+        return from(tag, null);
+    }
+
+    public static TagResponseDto from(Tag tag, Long questionCount) {
         return TagResponseDto.builder()
                 .id(tag.getId())
                 .name(tag.getName())
                 .color(tag.getColor())
+                .questionCount(questionCount)
                 .build();
     }
 }

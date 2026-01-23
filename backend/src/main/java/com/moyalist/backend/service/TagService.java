@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -21,8 +22,20 @@ public class TagService {
     private final UserRepository userRepository;
 
     public List<TagResponseDto> getAllTags() {
-        return tagRepository.findAll().stream()
-                .map(TagResponseDto::from)
+        // 모든 태그 조회
+        List<Tag> tags = tagRepository.findAll();
+
+        // 태그별 질문 개수 조회하고 Map으로 변환
+        // [[1, 5], [2, 3]] -> {1: 5, 2: 3}
+        List<Object[]> countResults = tagRepository.countQuestionsByTag();
+        Map<Long, Long> countMap = countResults.stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0], // key: 태그 ID
+                        row -> (Long) row[1] // value: 개수
+                ));
+        // 태그 + 개수 합쳐서 DTO 변환
+        return tags.stream()
+                .map(tag -> TagResponseDto.from(tag, countMap.getOrDefault(tag.getId(), 0L)))
                 .collect(Collectors.toList());
     }
 
