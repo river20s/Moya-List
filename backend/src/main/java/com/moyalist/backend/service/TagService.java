@@ -2,8 +2,10 @@ package com.moyalist.backend.service;
 
 import com.moyalist.backend.dto.TagRequestDto;
 import com.moyalist.backend.dto.TagResponseDto;
+import com.moyalist.backend.entity.QuestionTag;
 import com.moyalist.backend.entity.Tag;
 import com.moyalist.backend.entity.User;
+import com.moyalist.backend.repository.QuestionTagRepository;
 import com.moyalist.backend.repository.TagRepository;
 import com.moyalist.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,7 @@ public class TagService {
 
     private final TagRepository tagRepository;
     private final UserRepository userRepository;
+    private final QuestionTagRepository questionTagRepository;
 
     public List<TagResponseDto> getAllTags() {
         // 모든 태그 조회
@@ -70,6 +73,9 @@ public class TagService {
     public void deleteTag(Long id) {
         Tag tag = tagRepository.findById(id) // 태그 찾기
                 .orElseThrow(() -> new IllegalArgumentException("태그를 찾을 수 없습니다: " + id)); // 예외 (없으면)
+        // 연결된 question_tags 먼저 삭제
+        List<QuestionTag> questionTags = questionTagRepository.findByTagId(id);
+        questionTagRepository.deleteAll(questionTags);
         tagRepository.delete(tag); // 태그 삭제
     }
 }
