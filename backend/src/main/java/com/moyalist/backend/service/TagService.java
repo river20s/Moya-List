@@ -1,5 +1,6 @@
 package com.moyalist.backend.service;
 
+import com.moyalist.backend.dto.QuestionResponseDto;
 import com.moyalist.backend.dto.TagRequestDto;
 import com.moyalist.backend.dto.TagResponseDto;
 import com.moyalist.backend.entity.QuestionTag;
@@ -77,5 +78,16 @@ public class TagService {
         List<QuestionTag> questionTags = questionTagRepository.findByTagId(id);
         questionTagRepository.deleteAll(questionTags);
         tagRepository.delete(tag); // 태그 삭제
+    }
+
+    public List<QuestionResponseDto> getQuestionsByTagId(Long tagId) {
+        // 태그 존재 확인 (없으면 예외)
+        tagRepository.findById(tagId)
+                .orElseThrow(() -> new IllegalArgumentException("태그를 찾을 수 없습니다: " + tagId));
+        // 해당 태그와 연결된 QuestionTag 목록 조회
+        List<QuestionTag> questionTags = questionTagRepository.findByTagId(tagId);
+        return questionTags.stream()
+                .map(qt -> QuestionResponseDto.from(qt.getQuestion()))
+                .collect(Collectors.toList());
     }
 }

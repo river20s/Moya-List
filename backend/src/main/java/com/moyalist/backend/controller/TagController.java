@@ -1,5 +1,6 @@
 package com.moyalist.backend.controller;
 
+import com.moyalist.backend.dto.QuestionResponseDto;
 import com.moyalist.backend.dto.TagRequestDto;
 import com.moyalist.backend.dto.TagResponseDto;
 import com.moyalist.backend.service.TagService;
@@ -45,5 +46,11 @@ public class TagController {
     public ResponseEntity<Void> deleteTag(@PathVariable Long id) {
         tagService.deleteTag(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/questions")
+    public ResponseEntity<List<QuestionResponseDto>>
+    getQuestionByTagId(@PathVariable Long id) {
+        return ResponseEntity.ok(tagService.getQuestionsByTagId(id));
     }
 }
