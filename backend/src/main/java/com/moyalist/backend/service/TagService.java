@@ -1,5 +1,6 @@
 package com.moyalist.backend.service;
 
+import com.moyalist.backend.dto.TagRequestDto;
 import com.moyalist.backend.dto.TagResponseDto;
 import com.moyalist.backend.entity.Tag;
 import com.moyalist.backend.entity.User;
@@ -55,5 +56,13 @@ public class TagService {
                 .name(name)
                 .build();
         return TagResponseDto.from(tagRepository.save(tag));
+    }
+
+    @Transactional
+    public TagResponseDto updateTag(Long id, TagRequestDto request) {
+        Tag tag = tagRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("태그를 찾을 수 없습니다: " + id));
+        tag.update(request.getName(), request.getColor());
+        return TagResponseDto.from(tag);
     }
 }

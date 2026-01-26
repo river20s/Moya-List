@@ -1,5 +1,6 @@
 package com.moyalist.backend.controller;
 
+import com.moyalist.backend.dto.TagRequestDto;
 import com.moyalist.backend.dto.TagResponseDto;
 import com.moyalist.backend.service.TagService;
 import lombok.RequiredArgsConstructor;
@@ -33,5 +34,10 @@ public class TagController {
         Long userId = Long.parseLong(request.get("userId"));
         String name = request.get("name");
         return ResponseEntity.ok(tagService.createTag(userId, name));
+    }
+
+    @PutMapping("/{id}")
+    public  ResponseEntity<TagResponseDto> updateTag(@RequestBody TagRequestDto request, @PathVariable Long id) {
+        return ResponseEntity.ok(tagService.updateTag(id, request));
     }
 }

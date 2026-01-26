@@ -41,4 +41,14 @@ public class Tag {
         this.name = name;
         this.color = color != null ? color : "#6B7280";
     }
+
+    public void update(String name, String color) {
+        // null이면 기존 값 유지
+        if (name != null) {
+            this.name = name;
+        }
+        if (color != null) {
+            this.color = color;
+        }
+    }
 }
