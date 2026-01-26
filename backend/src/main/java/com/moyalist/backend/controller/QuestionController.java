@@ -12,6 +12,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -50,6 +51,8 @@ public class QuestionController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Long tagId,
             @RequestParam(required = false) Boolean isResolved,
+            @RequestParam(required = false) LocalDate startDate,
+            @RequestParam(required = false) LocalDate endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "createdAt,desc") String sort) {
@@ -66,7 +69,9 @@ public class QuestionController {
         Pageable pageable = PageRequest.of(page, size, sortBy);
 
         // 검색 실행
-        Page<QuestionResponseDto> result = questionService.searchQuestions(keyword, tagId, isResolved, pageable);
+        Page<QuestionResponseDto> result = questionService.searchQuestions(
+                keyword, tagId, isResolved, startDate, endDate, pageable
+        );
 
         return ResponseEntity.ok(result);
     }

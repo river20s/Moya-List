@@ -16,6 +16,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -107,10 +108,13 @@ public class QuestionService {
             String keyword,
             Long tagId,
             Boolean isResolved,
+            LocalDate startDate,
+            LocalDate endDate,
             Pageable pageable) {
 
         // Specification 생성: null 파라미터는 자동으로 무시됨
-        Specification<Question> spec = QuestionSpecification.searchWith(keyword, tagId, isResolved);
+        Specification<Question> spec = QuestionSpecification.searchWith(
+                keyword, tagId, isResolved, startDate, endDate);
 
         // Repository에서 Specification과 Pageable을 사용하여 검색
         // Page 객체는 데이터뿐만 아니라 총 개수, 페이지 정보도 포함

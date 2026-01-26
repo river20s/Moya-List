@@ -7,8 +7,10 @@ import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Question 엔티티에 대한 검색 조건을 정의하는 Specification 클래스
@@ -108,7 +110,13 @@ QuestionSpecification {
      * 이 메서드는 주어진 파라미터들을 AND 조건으로 조합합니다.
      * null인 파라미터는 무시됩니다 (동적 쿼리).
      */
-    public static Specification<Question> searchWith(String keyword, Long tagId, Boolean isResolved) {
+    public static Specification<Question> searchWith(
+            String keyword,
+            Long tagId,
+            Boolean isResolved,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -133,6 +141,25 @@ QuestionSpecification {
             // 해결 여부 조건 추가
             if (isResolved != null) {
                 predicates.add(cb.equal(root.get("isResolved"), isResolved));
+            }
+
+            // 시작일 조건 추가
+            // createdAt >= startDate 00:00:00
+            if (startDate != null) {
+                predicates.add(cb.greaterThanOrEqualTo(
+                        root.get("createdAt"),
+                        startDate.atStartOfDay()
+                ));
+            }
+
+            // 종료일 조건 추가
+            // createdAt < endDate+1 00:00:00
+            // 종료일 포함
+            if (endDate != null) {
+                predicates.add(cb.lessThan(
+                        root.get("createdAt"),
+                        endDate.plusDays(1).atStartOfDay()
+                ));
             }
 
             // 모든 조건을 AND로 연결
