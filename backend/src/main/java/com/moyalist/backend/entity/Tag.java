@@ -1,5 +1,6 @@
 package com.moyalist.backend.entity;
 
+import com.moyalist.backend.util.ColorGenerator;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -31,7 +32,7 @@ public class Tag {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         if (color == null) {
-            color = "#6B7280";
+            color = ColorGenerator.generateRandomColor();
         }
     }
 
@@ -39,7 +40,7 @@ public class Tag {
     public Tag(User user, String name, String color) {
         this.user = user;
         this.name = name;
-        this.color = color != null ? color : "#6B7280";
+        this.color = color != null ? color : ColorGenerator.generateRandomColor();
     }
 
     public void update(String name, String color) {
