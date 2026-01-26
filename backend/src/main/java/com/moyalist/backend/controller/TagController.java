@@ -40,4 +40,10 @@ public class TagController {
     public  ResponseEntity<TagResponseDto> updateTag(@RequestBody TagRequestDto request, @PathVariable Long id) {
         return ResponseEntity.ok(tagService.updateTag(id, request));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteTag(@PathVariable Long id) {
+        tagService.deleteTag(id);
+        return ResponseEntity.noContent().build();
+    }
 }

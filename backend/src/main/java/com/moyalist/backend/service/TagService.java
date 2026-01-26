@@ -65,4 +65,11 @@ public class TagService {
         tag.update(request.getName(), request.getColor());
         return TagResponseDto.from(tag);
     }
+
+    @Transactional
+    public void deleteTag(Long id) {
+        Tag tag = tagRepository.findById(id) // 태그 찾기
+                .orElseThrow(() -> new IllegalArgumentException("태그를 찾을 수 없습니다: " + id)); // 예외 (없으면)
+        tagRepository.delete(tag); // 태그 삭제
+    }
 }
