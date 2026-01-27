@@ -2,6 +2,7 @@ package com.moyalist.backend.controller;
 
 import com.moyalist.backend.dto.UserRequestDto;
 import com.moyalist.backend.dto.UserResponseDto;
+import com.moyalist.backend.dto.UserUpdateRequest;
 import com.moyalist.backend.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +34,8 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<UserResponseDto> updateUser(@PathVariable Long id, @Valid @RequestBody UserRequestDto request) {
+    public ResponseEntity<UserResponseDto> updateUser(@PathVariable Long id,
+                                                      @Valid @RequestBody UserUpdateRequest request) {
         return ResponseEntity.ok(userService.updateUser(id, request));
     }
 

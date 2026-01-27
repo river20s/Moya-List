@@ -46,4 +46,8 @@ public class User {
         this.email = email;
         this.profileUrl = profileUrl;
     }
+
+    public void updateName(String name) {
+        this.name = name;
+    }
 }
