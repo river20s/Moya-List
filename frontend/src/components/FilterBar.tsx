@@ -1,5 +1,6 @@
-import { Search, X, Circle, CheckCircle2, LayoutGrid, Calendar, Filter, Tag } from 'lucide-react';
+import { Search, X, Circle, CheckCircle2, Calendar, Tag as TagIcon } from 'lucide-react';
 import { getTagColor } from '../constants/colors';
+import type { Tag } from '../types';
 
 interface FilterBarProps {
   searchQuery: string;
@@ -7,14 +8,10 @@ interface FilterBarProps {
   statusFilter: 'all' | 'solved' | 'unsolved';
   onStatusChange: (status: 'all' | 'solved' | 'unsolved') => void;
   totalCount: number;
+  tags: Tag[];
+  selectedTagId: number | null;
+  onTagFilter: (tagId: number | null) => void;
 }
-
-// TODO: 실제 데이터 연동
-const mockTags = [
-  { id: 1, name: 'Spring', color: '#CAD3C0' },
-  { id: 2, name: 'React', color: '#D4E4F1' },
-  { id: 3, name: 'Database', color: '#F5EBC8' },
-];
 
 function FilterBar({
   searchQuery,
@@ -22,6 +19,9 @@ function FilterBar({
   statusFilter,
   onStatusChange,
   totalCount,
+  tags,
+  selectedTagId,
+  onTagFilter,
 }: FilterBarProps) {
   return (
     <div className="px-4 md:px-8 py-4 bg-[#F0EFEB] border-b border-slate-300/50">
@@ -91,18 +91,35 @@ function FilterBar({
         </div>
 
         {/* 태그 필터 */}
-        <div className="flex flex-wrap gap-2 items-center">
-          <Tag size={14} className="text-slate-400" />
-          {mockTags.map((tag) => (
+        {tags.length > 0 && (
+          <div className="flex flex-wrap gap-2 items-center">
+            <TagIcon size={14} className="text-slate-400" />
             <button
-              key={tag.id}
-              className="px-2.5 py-1 rounded-lg text-xs font-medium opacity-60 hover:opacity-100 transition-all"
-              style={{ backgroundColor: tag.color || getTagColor(tag.name) }}
+              onClick={() => onTagFilter(null)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                selectedTagId === null
+                  ? 'bg-[#D5D5D7] ring-2 ring-slate-400'
+                  : 'bg-[#D5D5D7] opacity-60 hover:opacity-100'
+              }`}
             >
-              {tag.name}
+              전체
             </button>
-          ))}
-        </div>
+            {tags.map((tag) => (
+              <button
+                key={tag.id}
+                onClick={() => onTagFilter(tag.id)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                  selectedTagId === tag.id
+                    ? 'ring-2 ring-slate-400'
+                    : 'opacity-60 hover:opacity-100'
+                }`}
+                style={{ backgroundColor: tag.color || getTagColor(tag.name) }}
+              >
+                {tag.name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

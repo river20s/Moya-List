@@ -1,21 +1,54 @@
-import { X, LayoutGrid, Circle, CheckCircle2, Tag, Edit2 } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { X, LayoutGrid, Circle, CheckCircle2, Edit2 } from 'lucide-react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { getTagColor } from '../constants/colors';
+import { tagApi } from '../api/tags';
+import type { Tag } from '../types';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-// TODO: 실제 데이터 연동
-const mockTags = [
-  { id: 1, name: 'Spring', color: '#CAD3C0' },
-  { id: 2, name: 'React', color: '#D4E4F1' },
-  { id: 3, name: 'Database', color: '#F5EBC8' },
-];
-
 function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [tags, setTags] = useState<Tag[]>([]);
+
+  const currentStatus = searchParams.get('status');
+  const currentTagId = searchParams.get('tagId');
+
+  const fetchTags = useCallback(async () => {
+    try {
+      const res = await tagApi.getAll();
+      setTags(res.data);
+    } catch (err) {
+      console.error('태그 목록 조회 실패:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTags();
+  }, [fetchTags]);
+
+  const handleStatusFilter = (status: string | null) => {
+    if (status) {
+      navigate(`/questions?status=${status}`);
+    } else {
+      navigate('/questions');
+    }
+  };
+
+  const handleTagFilter = (tagId: number | null) => {
+    if (tagId) {
+      navigate(`/questions?tagId=${tagId}`);
+    } else {
+      navigate('/questions');
+    }
+  };
+
+  const isQuestions = location.pathname === '/questions';
 
   return (
     <aside
@@ -43,22 +76,26 @@ function Sidebar({ isOpen, onClose }: SidebarProps) {
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {/* 상태 필터 */}
         <div className="space-y-1">
-          <Link
-            to="/"
+          <button
+            onClick={() => handleStatusFilter(null)}
             className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors
-              ${location.pathname === '/' ? 'bg-[#D4E4F1] text-slate-700' : 'text-slate-600 hover:bg-slate-300/20'}`}
+              ${isQuestions && !currentStatus && !currentTagId ? 'bg-[#D4E4F1] text-slate-700' : 'text-slate-600 hover:bg-slate-300/20'}`}
           >
             <LayoutGrid size={16} />
             전체 보기
-          </Link>
+          </button>
           <button
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-600 hover:bg-slate-300/20 transition-colors"
+            onClick={() => handleStatusFilter('unsolved')}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors
+              ${currentStatus === 'unsolved' ? 'bg-[#D4E4F1] text-slate-700' : 'text-slate-600 hover:bg-slate-300/20'}`}
           >
             <Circle size={16} className="text-slate-500" />
             미해결
           </button>
           <button
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-600 hover:bg-slate-300/20 transition-colors"
+            onClick={() => handleStatusFilter('solved')}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors
+              ${currentStatus === 'solved' ? 'bg-[#D4E4F1] text-slate-700' : 'text-slate-600 hover:bg-slate-300/20'}`}
           >
             <CheckCircle2 size={16} className="text-slate-500" />
             해결됨
@@ -82,14 +119,20 @@ function Sidebar({ isOpen, onClose }: SidebarProps) {
 
           <div className="flex flex-wrap gap-2 px-1">
             <button
-              className="px-2.5 py-1 rounded-lg text-xs font-medium bg-[#D5D5D7] ring-2 ring-slate-400"
+              onClick={() => handleTagFilter(null)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                !currentTagId ? 'bg-[#D5D5D7] ring-2 ring-slate-400' : 'bg-[#D5D5D7] opacity-60 hover:opacity-100'
+              }`}
             >
               전체
             </button>
-            {mockTags.map((tag) => (
+            {tags.map((tag) => (
               <button
                 key={tag.id}
-                className="px-2.5 py-1 rounded-lg text-xs font-medium transition-all hover:ring-2 hover:ring-slate-400"
+                onClick={() => handleTagFilter(tag.id)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                  currentTagId === String(tag.id) ? 'ring-2 ring-slate-400' : 'opacity-60 hover:opacity-100'
+                }`}
                 style={{ backgroundColor: tag.color || getTagColor(tag.name) }}
               >
                 {tag.name}
