@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import FilterBar from '../components/FilterBar';
 import QuestionCard from '../components/QuestionCard';
+import QuestionCreateModal from '../components/QuestionCreateModal';
 import { questionApi } from '../api/questions';
 import { tagApi } from '../api/tags';
 import type { Question, Tag } from '../types';
@@ -10,15 +12,19 @@ import type { Question, Tag } from '../types';
 const TEMP_USER_ID = 1;
 
 function QuestionListPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // 필터 상태
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'solved' | 'unsolved'>('all');
-  const [selectedTagId, setSelectedTagId] = useState<number | null>(null);
+  // URL 쿼리 파라미터에서 필터 상태 읽기
+  const searchQuery = searchParams.get('keyword') || '';
+  const statusParam = searchParams.get('status');
+  const statusFilter: 'all' | 'solved' | 'unsolved' =
+    statusParam === 'solved' || statusParam === 'unsolved' ? statusParam : 'all';
+  const selectedTagId = searchParams.get('tagId') ? Number(searchParams.get('tagId')) : null;
 
   // 페이지네이션
   const [page, setPage] = useState(0);
@@ -70,20 +76,31 @@ function QuestionListPage() {
     fetchQuestions();
   }, [fetchQuestions]);
 
-  // 검색어 변경 시 페이지 초기화
-  const handleSearchChange = (query: string) => {
-    setSearchQuery(query);
+  // 필터 변경 시 URL 쿼리 파라미터 업데이트
+  const updateParams = (updates: Record<string, string | null>) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('page'); // 필터 변경 시 페이지 초기화
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === null) {
+        newParams.delete(key);
+      } else {
+        newParams.set(key, value);
+      }
+    }
+    setSearchParams(newParams);
     setPage(0);
+  };
+
+  const handleSearchChange = (query: string) => {
+    updateParams({ keyword: query || null });
   };
 
   const handleStatusChange = (status: 'all' | 'solved' | 'unsolved') => {
-    setStatusFilter(status);
-    setPage(0);
+    updateParams({ status: status === 'all' ? null : status });
   };
 
   const handleTagFilter = (tagId: number | null) => {
-    setSelectedTagId(tagId);
-    setPage(0);
+    updateParams({ tagId: tagId ? String(tagId) : null });
   };
 
   const handleToggleResolved = async (id: number) => {
@@ -112,6 +129,20 @@ function QuestionListPage() {
     console.log('Click:', question);
   };
 
+  const handleQuickAdd = async (quickTitle: string) => {
+    if (!quickTitle.trim()) return;
+    try {
+      await questionApi.create({
+        userId: TEMP_USER_ID,
+        title: quickTitle.trim(),
+      });
+      fetchQuestions();
+      fetchTags();
+    } catch (err) {
+      console.error('질문 등록 실패:', err);
+    }
+  };
+
   return (
     <div className="min-h-screen">
       <FilterBar
@@ -125,7 +156,14 @@ function QuestionListPage() {
         onTagFilter={handleTagFilter}
       />
 
-      <div className="px-4 md:px-8 py-6">
+      {/* 빠른 입력 창 */}
+      <div className="px-4 md:px-8 pt-6">
+        <div className="max-w-3xl mx-auto">
+          <QuickInput onSubmit={handleQuickAdd} onDetailClick={() => setIsCreateModalOpen(true)} />
+        </div>
+      </div>
+
+      <div className="px-4 md:px-8 py-4">
         {loading ? (
           <div className="flex items-center justify-center min-h-[60vh]">
             <div className="text-slate-400 text-sm">불러오는 중...</div>
@@ -193,8 +231,54 @@ function QuestionListPage() {
       </div>
 
       {/* 플로팅 추가 버튼 */}
-      <button className="fixed bottom-6 right-6 w-14 h-14 bg-slate-700 text-white rounded-full shadow-lg hover:bg-slate-600 transition-colors flex items-center justify-center">
+      <button
+        onClick={() => setIsCreateModalOpen(true)}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-slate-700 text-white rounded-full shadow-lg hover:bg-slate-600 transition-colors flex items-center justify-center"
+      >
         <Plus size={24} />
+      </button>
+
+      {/* 질문 등록 모달 */}
+      <QuestionCreateModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreated={() => {
+          fetchQuestions();
+          fetchTags();
+        }}
+      />
+    </div>
+  );
+}
+
+// 빠른 입력 컴포넌트
+function QuickInput({ onSubmit, onDetailClick }: { onSubmit: (title: string) => void; onDetailClick: () => void }) {
+  const [value, setValue] = useState('');
+
+  const handleSubmit = () => {
+    if (!value.trim()) return;
+    onSubmit(value);
+    setValue('');
+  };
+
+  return (
+    <div className="flex gap-2">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') handleSubmit();
+        }}
+        placeholder="궁금한 것을 빠르게 입력하세요..."
+        className="flex-1 px-4 py-3 bg-white/50 border border-slate-300/50 rounded-xl text-sm focus:outline-none focus:border-slate-400 focus:bg-white transition-all"
+      />
+      <button
+        onClick={onDetailClick}
+        className="px-3 py-3 text-xs text-slate-500 hover:bg-slate-200/50 rounded-xl border border-slate-300/50 transition-colors whitespace-nowrap"
+        title="상세 입력"
+      >
+        상세
       </button>
     </div>
   );
