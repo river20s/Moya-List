@@ -1,21 +1,31 @@
-import { X, LayoutGrid, Circle, CheckCircle2, Tag, Edit2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { X, LayoutGrid, Circle, CheckCircle2, Edit2 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { getTagColor } from '../constants/colors';
+import { tagApi } from '../api/tags';
+import type { Tag } from '../types';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-// TODO: 실제 데이터 연동
-const mockTags = [
-  { id: 1, name: 'Spring', color: '#CAD3C0' },
-  { id: 2, name: 'React', color: '#D4E4F1' },
-  { id: 3, name: 'Database', color: '#F5EBC8' },
-];
-
 function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
+  const [tags, setTags] = useState<Tag[]>([]);
+
+  const fetchTags = useCallback(async () => {
+    try {
+      const res = await tagApi.getAll();
+      setTags(res.data);
+    } catch (err) {
+      console.error('태그 목록 조회 실패:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTags();
+  }, [fetchTags]);
 
   return (
     <aside
@@ -86,7 +96,7 @@ function Sidebar({ isOpen, onClose }: SidebarProps) {
             >
               전체
             </button>
-            {mockTags.map((tag) => (
+            {tags.map((tag) => (
               <button
                 key={tag.id}
                 className="px-2.5 py-1 rounded-lg text-xs font-medium transition-all hover:ring-2 hover:ring-slate-400"

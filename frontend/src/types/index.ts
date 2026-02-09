@@ -3,9 +3,11 @@ export interface Tag {
   id: number;
   name: string;
   color: string;
+  questionCount: number;
 }
 
 export interface TagRequest {
+  userId: number;
   name: string;
   color?: string;
 }
@@ -13,16 +15,18 @@ export interface TagRequest {
 // Question 관련 타입
 export interface Question {
   id: number;
+  userId: number;
+  userName: string;
   title: string;
   description: string | null;
   sourceUrl: string | null;
   isResolved: boolean;
   createdAt: string;
-  updatedAt: string | null;
   tags: Tag[];
 }
 
 export interface QuestionRequest {
+  userId: number;
   title: string;
   description?: string;
   sourceUrl?: string;

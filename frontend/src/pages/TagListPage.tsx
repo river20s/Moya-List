@@ -1,35 +1,51 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Plus, Edit2, Trash2, Check, X } from 'lucide-react';
 import type { Tag } from '../types';
 import { getTagColor, TAG_COLORS } from '../constants/colors';
+import { tagApi } from '../api/tags';
 
-// TODO: 실제 API 연동
-const initialTags: Tag[] = [
-  { id: 1, name: 'Spring', color: '#CAD3C0' },
-  { id: 2, name: 'React', color: '#D4E4F1' },
-  { id: 3, name: 'Database', color: '#F5EBC8' },
-  { id: 4, name: 'Security', color: '#EBD8DC' },
-];
+// TODO: 로그인 구현 후 실제 userId로 교체
+const TEMP_USER_ID = 1;
 
 function TagListPage() {
-  const [tags, setTags] = useState<Tag[]>(initialTags);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [loading, setLoading] = useState(true);
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState(TAG_COLORS[0]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
 
-  const handleAddTag = () => {
+  const fetchTags = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await tagApi.getAll();
+      setTags(res.data);
+    } catch (err) {
+      console.error('태그 목록 조회 실패:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTags();
+  }, [fetchTags]);
+
+  const handleAddTag = async () => {
     if (!newTagName.trim()) return;
 
-    const newTag: Tag = {
-      id: Date.now(),
-      name: newTagName.trim(),
-      color: newTagColor,
-    };
-
-    setTags([...tags, newTag]);
-    setNewTagName('');
-    setNewTagColor(TAG_COLORS[0]);
+    try {
+      const res = await tagApi.create({
+        userId: TEMP_USER_ID,
+        name: newTagName.trim(),
+        color: newTagColor,
+      });
+      setTags([...tags, res.data]);
+      setNewTagName('');
+      setNewTagColor(TAG_COLORS[0]);
+    } catch (err) {
+      console.error('태그 생성 실패:', err);
+    }
   };
 
   const handleStartEdit = (tag: Tag) => {
@@ -37,26 +53,46 @@ function TagListPage() {
     setEditingName(tag.name);
   };
 
-  const handleSaveEdit = (id: number) => {
+  const handleSaveEdit = async (id: number) => {
     if (!editingName.trim()) return;
 
-    setTags(tags.map((tag) =>
-      tag.id === id ? { ...tag, name: editingName.trim() } : tag
-    ));
-    setEditingId(null);
-    setEditingName('');
+    try {
+      const res = await tagApi.update(id, { name: editingName.trim() });
+      setTags(tags.map((tag) => (tag.id === id ? res.data : tag)));
+      setEditingId(null);
+      setEditingName('');
+    } catch (err) {
+      console.error('태그 수정 실패:', err);
+    }
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
     if (!window.confirm('이 태그를 삭제하시겠습니까?')) return;
-    setTags(tags.filter((tag) => tag.id !== id));
+
+    try {
+      await tagApi.delete(id);
+      setTags(tags.filter((tag) => tag.id !== id));
+    } catch (err) {
+      console.error('태그 삭제 실패:', err);
+    }
   };
 
-  const handleColorChange = (id: number, color: string) => {
-    setTags(tags.map((tag) =>
-      tag.id === id ? { ...tag, color } : tag
-    ));
+  const handleColorChange = async (id: number, color: string) => {
+    try {
+      const res = await tagApi.update(id, { color });
+      setTags(tags.map((tag) => (tag.id === id ? res.data : tag)));
+    } catch (err) {
+      console.error('태그 색상 변경 실패:', err);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-slate-400 text-sm">불러오는 중...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 md:px-8 py-6">
@@ -101,6 +137,9 @@ function TagListPage() {
                       style={{ backgroundColor: tag.color || getTagColor(tag.name) }}
                     >
                       {tag.name}
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      {tag.questionCount}개 질문
                     </span>
                     <div className="flex-1" />
 
