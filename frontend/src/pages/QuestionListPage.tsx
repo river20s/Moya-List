@@ -7,11 +7,10 @@ import QuestionCreateModal from '../components/QuestionCreateModal';
 import { questionApi } from '../api/questions';
 import { tagApi } from '../api/tags';
 import type { Question, Tag } from '../types';
-
-// TODO: 로그인 구현 후 실제 userId로 교체
-const TEMP_USER_ID = 1;
+import { useAuth } from '../context/AuthContext';
 
 function QuestionListPage() {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
@@ -133,7 +132,7 @@ function QuestionListPage() {
     if (!quickTitle.trim()) return;
     try {
       await questionApi.create({
-        userId: TEMP_USER_ID,
+        userId: user!.id,
         title: quickTitle.trim(),
       });
       fetchQuestions();

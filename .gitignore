@@ -145,3 +145,6 @@ nul
 
 # IntelliJ IDEA
 .idea/
+
+# Secret config (OAuth2 credentials)
+**/application-secret.yml
