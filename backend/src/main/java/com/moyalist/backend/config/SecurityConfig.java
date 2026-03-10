@@ -1,6 +1,7 @@
 package com.moyalist.backend.config;
 
 import com.moyalist.backend.auth.CustomOAuth2UserService;
+import com.moyalist.backend.auth.CustomOidcUserService;
 import com.moyalist.backend.auth.JwtAuthenticationFilter;
 import com.moyalist.backend.auth.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final CustomOAuth2UserService customOAuth2UserService;
+    private final CustomOidcUserService customOidcUserService;
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
@@ -42,7 +44,8 @@ public class SecurityConfig {
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo
-                                .userService(customOAuth2UserService))
+                                .userService(customOAuth2UserService)
+                                .oidcUserService(customOidcUserService))
                         .successHandler(oAuth2SuccessHandler)
                 )
                 // JWT 필터를 UsernamePasswordAuthenticationFilter 앞에 삽입

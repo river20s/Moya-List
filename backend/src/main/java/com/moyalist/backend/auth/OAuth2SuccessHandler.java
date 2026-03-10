@@ -1,10 +1,13 @@
 package com.moyalist.backend.auth;
 
+import com.moyalist.backend.entity.User;
+import com.moyalist.backend.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 
@@ -25,6 +28,7 @@ import java.io.IOException;
 public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final UserRepository userRepository;
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
@@ -35,10 +39,14 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             HttpServletResponse response,
             Authentication authentication
     ) throws IOException {
-        CustomOAuth2User oAuth2User = (CustomOAuth2User) authentication.getPrincipal();
-        Long userId = oAuth2User.getUserId();
+        // Google은 OIDC를 사용하므로 DefaultOidcUser가 반환됨 → OAuth2User로만 참조
+        OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
+        String email = oAuth2User.getAttribute("email");
 
-        String token = jwtTokenProvider.generateToken(userId);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("로그인 후 유저를 찾을 수 없음: " + email));
+
+        String token = jwtTokenProvider.generateToken(user.getId());
 
         // 프론트엔드의 /auth/callback 페이지로 토큰을 전달
         String redirectUrl = frontendUrl + "/auth/callback?token=" + token;
