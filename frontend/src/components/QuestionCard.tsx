@@ -82,7 +82,7 @@ function QuestionCard({ question, onToggleResolved, onDelete, onClick }: Questio
       <div className="flex justify-between items-end">
         <div className="flex items-center gap-2 text-slate-400">
           {question.description && (
-            <MessageSquare size={12} title="설명이 있습니다" />
+            <MessageSquare size={12} aria-label="설명이 있습니다" />
           )}
           <span className="text-[10px]">
             {new Date(question.createdAt).toLocaleDateString('ko-KR')}

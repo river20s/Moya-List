@@ -1,22 +1,21 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { questionApi } from '../api/questions';
-
-// TODO: 로그인 구현 후 실제 userId로 교체
-const TEMP_USER_ID = 1;
+import { useAuth } from '../context/AuthContext';
 
 function HomePage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [value, setValue] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
-    if (!value.trim() || submitting) return;
+    if (!value.trim() || submitting || !user) return;
 
     try {
       setSubmitting(true);
       await questionApi.create({
-        userId: TEMP_USER_ID,
+        userId: user.id,
         title: value.trim(),
       });
       navigate('/questions');
@@ -28,7 +27,6 @@ function HomePage() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-[#F0EFEB] px-4">
-      {/* 로고 */}
       <h1 className="logo-font text-4xl md:text-5xl text-slate-700 font-semibold mb-2">
         Moya List
       </h1>
@@ -36,7 +34,6 @@ function HomePage() {
         이게 뭐야? 하는 궁금증을 빠르게 캡처하세요
       </p>
 
-      {/* 입력 창 */}
       <div className="w-full max-w-xl">
         <input
           type="text"
@@ -52,7 +49,6 @@ function HomePage() {
         />
       </div>
 
-      {/* 하단 링크 */}
       <button
         onClick={() => navigate('/questions')}
         className="mt-8 text-xs text-slate-400 hover:text-slate-600 transition-colors"

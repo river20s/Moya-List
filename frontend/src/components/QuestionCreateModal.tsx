@@ -4,9 +4,7 @@ import { questionApi } from '../api/questions';
 import { tagApi } from '../api/tags';
 import { getTagColor } from '../constants/colors';
 import type { Tag } from '../types';
-
-// TODO: 로그인 구현 후 실제 userId로 교체
-const TEMP_USER_ID = 1;
+import { useAuth } from '../context/AuthContext';
 
 interface QuestionCreateModalProps {
   isOpen: boolean;
@@ -15,6 +13,7 @@ interface QuestionCreateModalProps {
 }
 
 function QuestionCreateModal({ isOpen, onClose, onCreated }: QuestionCreateModalProps) {
+  const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
@@ -34,7 +33,7 @@ function QuestionCreateModal({ isOpen, onClose, onCreated }: QuestionCreateModal
     try {
       setSubmitting(true);
       await questionApi.create({
-        userId: TEMP_USER_ID,
+        userId: user!.id,
         title: title.trim(),
         description: description.trim() || undefined,
         sourceUrl: sourceUrl.trim() || undefined,

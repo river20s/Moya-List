@@ -1,12 +1,12 @@
-import { Menu, LogIn, User } from 'lucide-react';
+import { Menu, LogIn, User, LogOut } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
   onMenuClick: () => void;
 }
 
 function Header({ onMenuClick }: HeaderProps) {
-  // TODO: 실제 인증 연동 시 변경
-  const user = null;
+  const { user, logout } = useAuth();
 
   return (
     <header className="flex items-center justify-between px-4 md:px-8 py-4 bg-[#F0EFEB]/80 backdrop-blur-sm border-b border-slate-300/50">
@@ -24,15 +24,27 @@ function Header({ onMenuClick }: HeaderProps) {
 
       <div className="flex items-center gap-2">
         {!user ? (
-          <button className="flex items-center gap-1 px-3 py-1.5 bg-slate-700 text-white text-xs rounded-lg hover:bg-slate-600 transition-colors">
+          <button
+            onClick={() => window.location.href = '/login'}
+            className="flex items-center gap-1 px-3 py-1.5 bg-slate-700 text-white text-xs rounded-lg hover:bg-slate-600 transition-colors"
+          >
             <LogIn size={14} />
             로그인
           </button>
         ) : (
-          <button className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-200/50 rounded-lg transition-colors">
-            <User size={16} className="text-slate-600" />
-            <span className="text-xs text-slate-600">사용자</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg">
+              <User size={16} className="text-slate-600" />
+              <span className="text-xs text-slate-600">{user.name}</span>
+            </div>
+            <button
+              onClick={logout}
+              className="flex items-center gap-1 px-3 py-1.5 hover:bg-slate-200/50 rounded-lg transition-colors text-slate-500"
+              title="로그아웃"
+            >
+              <LogOut size={14} />
+            </button>
+          </div>
         )}
       </div>
     </header>
