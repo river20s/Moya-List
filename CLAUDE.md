@@ -32,18 +32,20 @@
 
 ### Backend
 - **Language**: Java 17
-- **Framework**: Spring Boot 3.4.1
+- **Framework**: Spring Boot 3.5.9
 - **ORM**: Spring Data JPA
 - **Database**: MySQL 8.0
-- **Cache**: Redis 7 (세션/캐싱용, 추후 적용)
+- **Auth**: Spring Security + OAuth2 (Google) + JWT
 - **Build**: Gradle (Groovy)
 
 ### Infrastructure
 - **Container**: Docker Compose
 - **Cloud**: AWS (예정)
 
-### Frontend (예정)
-- React
+### Frontend
+- React + TypeScript + Vite (포트 5173 고정)
+- Tailwind CSS
+- React Router, Axios
 
 ### Extension (예정)
 - Chrome Extension
@@ -53,14 +55,22 @@
 ```
 moya-list/
 ├── backend/
-│   └── src/main/java/com/river/moyalist/
+│   └── src/main/java/com/moyalist/backend/
+│       ├── auth/           # JWT, OAuth2 인증 관련
 │       ├── controller/     # REST API 엔드포인트
 │       ├── service/        # 비즈니스 로직
 │       ├── repository/     # JPA Repository
 │       ├── entity/         # JPA Entity
 │       ├── dto/            # Request/Response DTO
+│       ├── specification/  # JPA Specification (동적 검색)
 │       └── exception/      # 예외 처리
-├── frontend/               # React 웹 클라이언트 (예정)
+├── frontend/
+│   └── src/
+│       ├── api/            # Axios API 클라이언트
+│       ├── components/     # 공통 UI 컴포넌트
+│       ├── context/        # React Context (AuthContext)
+│       ├── pages/          # 페이지 컴포넌트
+│       └── types/          # TypeScript 타입 정의
 ├── extension/              # Chrome Extension (예정)
 ├── docs/                   # 설계 문서
 ├── init/                   # DB 초기화 스크립트
@@ -160,22 +170,20 @@ questions (N) ────< (N) tags  [through question_tags]
 ### GitHub 작업 흐름
 ```bash
 # 1. 이슈 확인 후 브랜치 생성
-git checkout develop
-git pull origin develop
-git checkout -b feature/10-question-search
+git checkout main
+git pull origin main
+git checkout -b feature/28-jwt-user-extraction
 
 # 2. 작업 후 커밋
 git add .
-git commit -m "feat: Question 검색 기능 구현 (#10)"
+git commit -m "feat: userId를 JWT 토큰에서 추출 (#28)"
 
 # 3. 푸시 및 PR 생성
-git push origin feature/10-question-search
-# GitHub에서 PR 생성: feature/10-question-search → develop
+git push origin feature/28-jwt-user-extraction
+gh pr create --title "..." --body "..."
 
-# 4. 머지 후 브랜치 삭제
-git checkout develop
-git pull origin develop
-git branch -d feature/10-question-search
+# 4. 머지 후 브랜치 삭제 (gh pr merge --squash --delete-branch)
+git checkout main && git pull origin main
 ```
 
 ### 이슈 기반 개발
@@ -255,99 +263,109 @@ cd backend
 ## 기능 명세
 
 ### User (사용자)
-| 기능 | 설명 | 우선순위 | 상태 |
-|------|------|----------|------|
-| 소셜 로그인 | Google, 카카오, 네이버 OAuth | 높음 | 미진행 |
-| 프로필 조회 | 사용자 정보 조회 API | 높음 | ✅ 완료 |
-| 프로필 수정 | 닉네임, 프로필 사진 수정 | 중간 | 미진행 |
+| 기능 | 설명 | 우선순위 | 상태 | 이슈 |
+|------|------|----------|------|------|
+| 소셜 로그인 | Google OAuth2 + JWT | 높음 | ✅ 완료 | #15 |
+| 프로필 조회 | 사용자 정보 조회 API | 높음 | ✅ 완료 | #9 |
+| 프로필 수정 | 닉네임 수정 | 중간 | ✅ 완료 | #16 |
 
 ### Question (질문)
 | 기능 | 설명 | 우선순위 | 상태 | 이슈 |
 |------|------|----------|------|------|
 | 질문 생성 | 제목, 설명, 출처URL 입력 | 높음 | ✅ 완료 | |
 | 질문 조회 | 단건/목록 조회 | 높음 | ✅ 완료 | |
-| 질문 수정 | 제목, 설명, 출처URL 수정 | 높음 | ✅ 완료 | |
-| 질문 삭제 | soft delete | 높음 | ✅ 완료 | |
-| 해결 표시 | isResolved 토글 API | 높음 | 미진행 | |
+| 질문 수정 | 제목, 설명, 출처URL 수정 | 높음 | ✅ 완료 | #7 |
+| 질문 삭제 | soft delete | 높음 | ✅ 완료 | #7 |
+| 해결 표시 | isResolved 토글 API | 높음 | ✅ 완료 | #11 |
 | 태그 연결 | 질문에 태그 연결/해제 | 높음 | ✅ 완료 | #8 |
 
 ### Tag (태그)
 | 기능 | 설명 | 우선순위 | 상태 | 이슈 |
 |------|------|----------|------|------|
-| 태그 생성 | 새 태그 추가 | 높음 | ✅ 완료 | #8 |
+| 태그 생성 | 새 태그 추가 (랜덤 색상) | 높음 | ✅ 완료 | #8 |
 | 태그 조회 | 전체/단건 조회 | 높음 | ✅ 완료 | #8 |
-| 태그 수정 | 태그명, 색상 변경 | 중간 | 미진행 | |
-| 태그 삭제 | 태그 삭제 | 중간 | 미진행 | |
-| 태그별 질문 조회 | 특정 태그의 질문 목록 | 높음 | 미진행 | |
+| 태그 수정 | 태그명, 색상 변경 | 중간 | ✅ 완료 | #13 |
+| 태그 삭제 | 태그 삭제 | 중간 | ✅ 완료 | #14 |
+| 태그별 질문 조회 | 특정 태그의 질문 목록 | 높음 | ✅ 완료 | #25 |
 
 ### 검색/필터링
 | 기능 | 설명 | 우선순위 | 상태 | 이슈 |
 |------|------|----------|------|------|
-| 키워드 검색 | 제목/설명 검색 | 높음 | 🔄 진행중 | #10 |
-| 태그 필터링 | 태그 기반 필터 | 높음 | 🔄 진행중 | #10 |
-| 해결 상태 필터링 | isResolved 필터 | 높음 | 🔄 진행중 | #10 |
-| 페이지네이션 | 목록 페이징 | 높음 | 🔄 진행중 | #10 |
-| 등록일 검색 | 일자 범위 검색 | 중간 | 미진행 | |
+| 키워드 검색 | 제목/설명 검색 | 높음 | ✅ 완료 | #10 |
+| 태그 필터링 | 태그 기반 필터 | 높음 | ✅ 완료 | #10 |
+| 해결 상태 필터링 | isResolved 필터 | 높음 | ✅ 완료 | #10 |
+| 페이지네이션 | 목록 페이징 | 높음 | ✅ 완료 | #10 |
+| 등록일 검색 | 일자 범위 검색 | 중간 | ✅ 완료 | #17 |
+
+### 인증/보안
+| 기능 | 설명 | 우선순위 | 상태 | 이슈 |
+|------|------|----------|------|------|
+| userId JWT 추출 | 요청 Body userId 제거, 토큰에서 추출 | 높음 | 🔄 진행 예정 | #28 |
 
 ### 첨부파일 (Attachment)
 | 기능 | 설명 | 우선순위 | 상태 | 비고 |
 |------|------|----------|------|------|
-| 파일 업로드 | 질문에 파일 첨부 | 중간 | 미진행 | S3 연동 필요 |
+| 파일 업로드 | 질문에 파일 첨부 | 중간 | 미진행 | S3 연동 필요 (#18) |
 | 파일 삭제 | 첨부파일 삭제 | 중간 | 미진행 | |
 
 ### 통계
 | 기능 | 설명 | 우선순위 | 상태 | 비고 |
 |------|------|----------|------|------|
-| Top 5 태그 | 주간/월간/연간 인기 태그 | 중간 | 미진행 | |
-| 활동 히트맵 | GitHub 스타일 기여 히트맵 | 낮음 | 미진행 | 프론트 작업 필요 |
+| Top 5 태그 | 인기 태그 통계 API | 중간 | ✅ 완료 | #19 |
+| 활동 히트맵 | GitHub 스타일 기여 히트맵 | 낮음 | 미진행 | 프론트 작업 필요 (#20) |
 
 ### 게스트 모드
 | 기능 | 설명 | 우선순위 | 상태 | 비고 |
 |------|------|----------|------|------|
-| 비로그인 질문 | 쿠키/캐시로 데이터 저장 | 중간 | 미진행 | LocalStorage |
-| 데이터 마이그레이션 | 로그인 시 게스트 데이터 이관 | 중간 | 미진행 | |
+| 비로그인 질문 | LocalStorage 저장 | 낮음 | 미진행 | #21 |
+| 데이터 마이그레이션 | 로그인 시 게스트 데이터 이관 | 낮음 | 미진행 | |
 
 ### 브라우저 익스텐션
 | 기능 | 설명 | 우선순위 | 상태 | 비고 |
 |------|------|----------|------|------|
-| 텍스트 선택 추가 | 우클릭 → MoyaList에 추가 | 낮음 | 미진행 | 별도 프로젝트 |
+| 텍스트 선택 추가 | 우클릭 → MoyaList에 추가 | 낮음 | 미진행 | 별도 프로젝트 (#22) |
 | 자동 출처 등록 | 현재 페이지 URL 자동 입력 | 낮음 | 미진행 | |
 | 익스텐션 로그인 | 로그인 상태 유지 | 낮음 | 미진행 | |
 
 ## 현재 진행 상황
 
 ### 완료
-- [x] 프로젝트 초기 설정
-- [x] Docker 환경 구성 (MySQL, Redis)
+- [x] 프로젝트 초기 설정 및 Docker 환경 구성
 - [x] ERD 및 DDL 작성
 - [x] JPA Entity 구현 (User, Question, Tag, Attachment, QuestionTag)
 - [x] 기본 CRUD API (User, Question, Tag)
 - [x] DTO 및 예외 처리 구현
 - [x] Question-Tag 연결 기능 (#8)
+- [x] Question 검색/필터링/페이지네이션 (#10)
+- [x] 해결 상태 토글 API (#11)
+- [x] 태그 수정/삭제 API (#13, #14)
+- [x] 태그 생성 랜덤 색상 (#23)
+- [x] Top 5 인기 태그 통계 API (#19)
+- [x] 등록일 기반 검색 (#17)
+- [x] 태그별 질문 조회 (#25)
+- [x] Google OAuth2 로그인 + JWT 인증 (#15)
+- [x] React 프론트엔드 기본 구현 (질문 목록/등록/필터, 태그, 로그인)
 
-### 진행 중
-- [ ] #10: Question 검색/필터링 기능
-  - 키워드 검색 (title, description)
-  - 태그별 필터링
-  - 해결 상태 필터링
-  - 페이지네이션
-
-### 예정
-- [ ] 인증/인가 (Spring Security + OAuth2)
-- [ ] 첨부파일 업로드 (S3)
-- [ ] 게스트 모드 구현
-- [ ] 통계/히트맵 API
-- [ ] React 프론트엔드
-- [ ] Chrome Extension
-- [ ] 배포 (AWS)
+### 진행 예정 (우선순위 순)
+- [ ] #28: userId를 JWT 토큰에서 추출 (보안 개선)
+- [ ] 배포 (AWS EC2 + RDS)
+- [ ] #18: 첨부파일 업로드 (S3)
+- [ ] #20: 활동 히트맵
+- [ ] #21: 게스트 모드
+- [ ] #22: Chrome Extension
 
 ## 주의사항
 
 ### 작업 시 확인할 것
-1. 새 기능 작업 전 `develop` 브랜치에서 최신 pull
+1. 새 기능 작업 전 `main` 브랜치에서 최신 pull
 2. feature 브랜치 생성 후 작업
 3. 커밋 메시지 컨벤션 준수
 4. PR 전 테스트 통과 확인
+
+### 환경변수 관리
+- `backend/src/main/resources/application-secret.yml` — 로컬 시크릿 (gitignore됨)
+- Google OAuth2 Client ID/Secret, JWT Secret 포함
+- `.env.example` 참고하여 작성
 
 ### 엔티티 수정 시
 - `ddl-auto: validate` 설정이므로 스키마 변경 시 DDL 직접 실행 필요
