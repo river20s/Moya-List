@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Lightbulb, Trash2 } from 'lucide-react';
+import { Plus, Lightbulb, Trash2, Download, X } from 'lucide-react';
 import FilterBar from '../components/FilterBar';
 import QuestionCard from '../components/QuestionCard';
 import QuestionCreateModal from '../components/QuestionCreateModal';
@@ -22,6 +22,15 @@ function AuthenticatedQuestionList() {
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
+
+  // 게스트 이관 배너
+  const [guestQuestions, setGuestQuestions] = useState<GuestQuestion[]>([]);
+  const [migrating, setMigrating] = useState(false);
+
+  useEffect(() => {
+    const saved = guestStorage.getAll();
+    if (saved.length > 0) setGuestQuestions(saved);
+  }, []);
 
   const searchQuery = searchParams.get('keyword') || '';
   const statusParam = searchParams.get('status');
@@ -61,6 +70,27 @@ function AuthenticatedQuestionList() {
 
   useEffect(() => { fetchTags(); }, [fetchTags]);
   useEffect(() => { fetchQuestions(); }, [fetchQuestions]);
+
+  const handleMigrate = async () => {
+    setMigrating(true);
+    try {
+      await questionApi.migrateGuest(
+        guestQuestions.map((q) => ({ title: q.title, description: q.description, sourceUrl: q.sourceUrl }))
+      );
+      guestStorage.clear();
+      setGuestQuestions([]);
+      fetchQuestions();
+    } catch {
+      setGuestQuestions([]);
+    } finally {
+      setMigrating(false);
+    }
+  };
+
+  const handleDismiss = () => {
+    guestStorage.clear();
+    setGuestQuestions([]);
+  };
 
   const updateParams = (updates: Record<string, string | null>) => {
     const newParams = new URLSearchParams(searchParams);
@@ -104,6 +134,34 @@ function AuthenticatedQuestionList() {
 
   return (
     <div className="min-h-screen">
+      {/* 게스트 질문 이관 배너 */}
+      {guestQuestions.length > 0 && (
+        <div className="px-4 md:px-8 py-3 bg-blue-50 border-b border-blue-100">
+          <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
+            <p className="text-sm text-blue-700">
+              게스트 상태에서 작성한 질문이 <strong>{guestQuestions.length}개</strong> 있습니다. 계정으로 불러올까요?
+            </p>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handleMigrate}
+                disabled={migrating}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-500 disabled:opacity-50 transition-colors"
+              >
+                <Download size={13} />
+                {migrating ? '불러오는 중...' : '불러오기'}
+              </button>
+              <button
+                onClick={handleDismiss}
+                className="p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                title="무시"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <FilterBar
         searchQuery={searchQuery}
         onSearchChange={(q) => updateParams({ keyword: q || null })}

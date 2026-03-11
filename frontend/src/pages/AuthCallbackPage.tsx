@@ -1,14 +1,11 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { questionApi } from '../api/questions';
-import { guestStorage } from '../utils/guestStorage';
 
 /**
  * OAuth2 로그인 완료 후 리다이렉트되는 페이지.
  *
  * 1. URL의 token을 localStorage에 저장
- * 2. 게스트 질문이 있으면 서버로 이관
- * 3. /questions으로 이동
+ * 2. /questions으로 이동 (게스트 질문 이관은 QuestionListPage에서 사용자에게 확인 후 진행)
  */
 function AuthCallbackPage() {
   const [searchParams] = useSearchParams();
@@ -16,36 +13,10 @@ function AuthCallbackPage() {
 
   useEffect(() => {
     const token = searchParams.get('token');
-    if (!token) {
-      navigate('/questions', { replace: true });
-      return;
+    if (token) {
+      localStorage.setItem('token', token);
     }
-
-    localStorage.setItem('token', token);
-
-    const guestQuestions = guestStorage.getAll();
-
-    if (guestQuestions.length === 0) {
-      navigate('/questions', { replace: true });
-      return;
-    }
-
-    // 게스트 질문을 서버로 이관
-    questionApi
-      .migrateGuest(guestQuestions.map((q) => ({
-        title: q.title,
-        description: q.description,
-        sourceUrl: q.sourceUrl,
-      })))
-      .then(() => {
-        guestStorage.clear();
-      })
-      .catch(() => {
-        // 이관 실패해도 로그인은 성공 처리
-      })
-      .finally(() => {
-        navigate('/questions', { replace: true });
-      });
+    navigate('/questions', { replace: true });
   }, [searchParams, navigate]);
 
   return (
