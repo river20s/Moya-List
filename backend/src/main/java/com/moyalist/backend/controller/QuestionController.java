@@ -6,6 +6,7 @@ import com.moyalist.backend.service.QuestionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -23,8 +24,10 @@ public class QuestionController {
     private final QuestionService questionService;
 
     @PostMapping
-    public ResponseEntity<QuestionResponseDto> createQuestion(@Valid @RequestBody QuestionRequestDto request) {
-        QuestionResponseDto response = questionService.createQuestion(request);
+    public ResponseEntity<QuestionResponseDto> createQuestion(
+            @AuthenticationPrincipal Long userId,
+            @Valid @RequestBody QuestionRequestDto request) {
+        QuestionResponseDto response = questionService.createQuestion(userId, request);
         return ResponseEntity.ok(response);
     }
 

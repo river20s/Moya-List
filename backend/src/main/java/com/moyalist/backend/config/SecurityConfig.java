@@ -40,7 +40,9 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/login/oauth2/**", "/oauth2/**", "/api/auth/**").permitAll()
-                        .anyRequest().permitAll()  // 추후 인증 필요한 API는 authenticated()로 변경
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/**").permitAll()
+                        .requestMatchers("/api/**").authenticated()
+                        .anyRequest().permitAll()
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo

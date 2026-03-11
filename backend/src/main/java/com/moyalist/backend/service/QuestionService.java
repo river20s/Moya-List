@@ -30,9 +30,9 @@ public class QuestionService {
     private final TagRepository tagRepository;
 
     @Transactional
-    public QuestionResponseDto createQuestion(QuestionRequestDto request) {
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + request.getUserId()));
+    public QuestionResponseDto createQuestion(Long userId, QuestionRequestDto request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
 
         Question question = Question.builder()
                 .user(user)

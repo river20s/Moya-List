@@ -3,10 +3,8 @@ import { Plus, Edit2, Trash2, Check, X } from 'lucide-react';
 import type { Tag } from '../types';
 import { getTagColor, TAG_COLORS } from '../constants/colors';
 import { tagApi } from '../api/tags';
-import { useAuth } from '../context/AuthContext';
 
 function TagListPage() {
-  const { user } = useAuth();
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [newTagName, setNewTagName] = useState('');
@@ -35,7 +33,6 @@ function TagListPage() {
 
     try {
       const res = await tagApi.create({
-        userId: user!.id,
         name: newTagName.trim(),
         color: newTagColor,
       });
