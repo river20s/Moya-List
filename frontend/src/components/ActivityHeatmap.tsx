@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { statsApi } from '../api/stats';
+import { statsApi, type DailyActivity } from '../api/stats';
 import { useAuth } from '../context/AuthContext';
 import type { Question } from '../types';
 
@@ -17,16 +17,13 @@ function toDateStr(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-// 오늘 기준 최근 N주의 날짜를 주 단위 2D 배열로 반환 (열=주, 행=요일 0~6)
 function buildRollingGrid(weeks: number): (Date | null)[][] {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // 그리드 끝 날짜: 이번 주 토요일 (오늘이 속한 주의 마지막 날)
   const endDate = new Date(today);
   endDate.setDate(today.getDate() + (6 - today.getDay()));
 
-  // 그리드 시작 날짜: 끝에서 weeks주 * 7일 전
   const startDate = new Date(endDate);
   startDate.setDate(endDate.getDate() - weeks * 7 + 1);
 
@@ -37,7 +34,6 @@ function buildRollingGrid(weeks: number): (Date | null)[][] {
     const week: (Date | null)[] = [];
     for (let d = 0; d < 7; d++) {
       const cell = new Date(cursor);
-      // 미래 날짜는 null
       week.push(cell <= today ? cell : null);
       cursor.setDate(cursor.getDate() + 1);
     }
@@ -46,14 +42,27 @@ function buildRollingGrid(weeks: number): (Date | null)[][] {
   return grid;
 }
 
+function QuestionItem({ q }: { q: Question }) {
+  return (
+    <div className="py-2 px-1">
+      <p className="text-xs text-slate-700 leading-snug">{q.title}</p>
+      {q.sourceUrl && (
+        <p className="text-[11px] text-slate-400 mt-0.5 truncate">{q.sourceUrl}</p>
+      )}
+    </div>
+  );
+}
+
 interface DayDetailModalProps {
   date: string;
-  questions: Question[];
+  activity: DailyActivity | null;
   loading: boolean;
   onClose: () => void;
 }
 
-function DayDetailModal({ date, questions, loading, onClose }: DayDetailModalProps) {
+function DayDetailModal({ date, activity, loading, onClose }: DayDetailModalProps) {
+  const isEmpty = activity && activity.created.length === 0 && activity.resolved.length === 0;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/20" />
@@ -62,29 +71,38 @@ function DayDetailModal({ date, questions, loading, onClose }: DayDetailModalPro
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h3 className="text-sm font-medium text-slate-700">{date} 활동</h3>
+          <h3 className="text-sm font-medium text-slate-700">{date}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
         </div>
-        <div className="overflow-y-auto flex-1 p-4 space-y-2">
+
+        <div className="overflow-y-auto flex-1 p-4">
           {loading ? (
             <p className="text-sm text-slate-400 text-center py-6">불러오는 중...</p>
-          ) : questions.length === 0 ? (
+          ) : isEmpty ? (
             <p className="text-sm text-slate-400 text-center py-6">활동 내역이 없습니다.</p>
           ) : (
-            questions.map((q) => (
-              <div key={q.id} className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                <div className="flex items-start gap-2">
-                  <span className={`mt-1 flex-shrink-0 w-2 h-2 rounded-full ${q.isResolved ? 'bg-green-400' : 'bg-slate-300'}`} />
-                  <div className="min-w-0">
-                    <p className="text-sm text-slate-700 leading-snug">{q.title}</p>
-                    <div className="flex gap-2 mt-1 text-[11px] text-slate-400">
-                      <span>등록 {q.createdAt.slice(0, 10)}</span>
-                      {q.resolvedAt && <span>· 해결 {q.resolvedAt.slice(0, 10)}</span>}
-                    </div>
+            <div className="space-y-4">
+              {activity!.created.length > 0 && (
+                <section>
+                  <h4 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                    궁금해한 것 · {activity!.created.length}
+                  </h4>
+                  <div className="divide-y divide-slate-100">
+                    {activity!.created.map((q) => <QuestionItem key={q.id} q={q} />)}
                   </div>
-                </div>
-              </div>
-            ))
+                </section>
+              )}
+              {activity!.resolved.length > 0 && (
+                <section>
+                  <h4 className="text-[11px] font-semibold text-green-500 uppercase tracking-wider mb-2">
+                    해결한 것 · {activity!.resolved.length}
+                  </h4>
+                  <div className="divide-y divide-slate-100">
+                    {activity!.resolved.map((q) => <QuestionItem key={q.id} q={q} />)}
+                  </div>
+                </section>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -98,34 +116,36 @@ export default function ActivityHeatmap() {
   const { user } = useAuth();
   const [heatmapData, setHeatmapData] = useState<Record<string, number>>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [dailyQuestions, setDailyQuestions] = useState<Question[]>([]);
+  const [dailyActivity, setDailyActivity] = useState<DailyActivity | null>(null);
   const [dailyLoading, setDailyLoading] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     const currentYear = new Date().getFullYear();
-    // 연도 경계 처리: 1월이면 작년 데이터도 필요할 수 있음
-    const promises = [statsApi.getHeatmap(currentYear)];
-    if (new Date().getMonth() === 0) {
-      promises.push(statsApi.getHeatmap(currentYear - 1));
-    }
-    Promise.all(promises).then((results) => {
-      const merged: Record<string, number> = {};
-      results.forEach((res) => Object.assign(merged, res.data));
-      setHeatmapData(merged);
-    });
+    const years = [currentYear];
+    if (new Date().getMonth() === 0) years.push(currentYear - 1);
+
+    Promise.all(years.map((y) => statsApi.getHeatmap(y)))
+      .then((results) => {
+        const merged: Record<string, number> = {};
+        results.forEach((res) => Object.assign(merged, res.data));
+        setHeatmapData(merged);
+      })
+      .catch(() => {
+        // 히트맵 로드 실패 시 빈 데이터 유지
+      });
   }, [user]);
 
-  const grid = buildRollingGrid(WEEKS); // 12주 × 7일
+  const grid = buildRollingGrid(WEEKS);
 
   const handleCellClick = async (date: Date) => {
     const dateStr = toDateStr(date);
     setSelectedDate(dateStr);
     setDailyLoading(true);
-    setDailyQuestions([]);
+    setDailyActivity(null);
     try {
-      const res = await statsApi.getDailyQuestions(dateStr);
-      setDailyQuestions(res.data);
+      const res = await statsApi.getDailyActivity(dateStr);
+      setDailyActivity(res.data);
     } finally {
       setDailyLoading(false);
     }
@@ -141,7 +161,6 @@ export default function ActivityHeatmap() {
         </h3>
         <div className="px-1">
           <div className="bg-white/30 rounded-lg p-3">
-            {/* 셀 그리드: 열=주, 행=요일 */}
             <div className="flex gap-0.5">
               {grid.map((week, wi) => (
                 <div key={wi} className="flex flex-col gap-0.5">
@@ -172,7 +191,7 @@ export default function ActivityHeatmap() {
       {selectedDate && (
         <DayDetailModal
           date={selectedDate}
-          questions={dailyQuestions}
+          activity={dailyActivity}
           loading={dailyLoading}
           onClose={() => setSelectedDate(null)}
         />

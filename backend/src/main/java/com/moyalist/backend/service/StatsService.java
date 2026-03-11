@@ -1,5 +1,6 @@
 package com.moyalist.backend.service;
 
+import com.moyalist.backend.dto.DailyActivityResponse;
 import com.moyalist.backend.dto.QuestionResponseDto;
 import com.moyalist.backend.dto.TagStatsResponse;
 import com.moyalist.backend.repository.QuestionRepository;
@@ -48,14 +49,18 @@ public class StatsService {
         return result;
     }
 
-    // 특정 날짜에 활동(생성 또는 해결)한 질문 목록
-    public List<QuestionResponseDto> getDailyQuestions(Long userId, LocalDate date) {
+    // 특정 날짜의 활동: 생성된 질문 / 해결된 질문 분리 반환
+    public DailyActivityResponse getDailyActivity(Long userId, LocalDate date) {
         LocalDateTime start = date.atStartOfDay();
         LocalDateTime end = start.plusDays(1);
-        return questionRepository.findByActivityDate(userId, start, end)
-                .stream()
-                .map(QuestionResponseDto::from)
-                .collect(Collectors.toList());
+
+        List<QuestionResponseDto> created = questionRepository.findCreatedOnDate(userId, start, end)
+                .stream().map(QuestionResponseDto::from).collect(Collectors.toList());
+
+        List<QuestionResponseDto> resolved = questionRepository.findResolvedOnDate(userId, start, end)
+                .stream().map(QuestionResponseDto::from).collect(Collectors.toList());
+
+        return new DailyActivityResponse(created, resolved);
     }
 
     private LocalDateTime calculateStartDate(String period) {

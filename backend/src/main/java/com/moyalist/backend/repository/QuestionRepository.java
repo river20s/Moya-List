@@ -26,12 +26,19 @@ public interface QuestionRepository extends JpaRepository<Question, Long>,
                    "GROUP BY DATE(resolved_at)", nativeQuery = true)
     List<Object[]> countResolvedByDay(@Param("userId") Long userId, @Param("year") int year);
 
-    // 특정 날짜에 생성되거나 해결된 질문 목록
+    // 특정 날짜에 생성된 질문 목록
     @Query("SELECT q FROM Question q WHERE q.user.id = :userId " +
-           "AND (q.createdAt >= :start AND q.createdAt < :end " +
-           "     OR (q.resolvedAt IS NOT NULL AND q.resolvedAt >= :start AND q.resolvedAt < :end)) " +
+           "AND q.createdAt >= :start AND q.createdAt < :end " +
            "ORDER BY q.createdAt DESC")
-    List<Question> findByActivityDate(@Param("userId") Long userId,
+    List<Question> findCreatedOnDate(@Param("userId") Long userId,
+                                     @Param("start") LocalDateTime start,
+                                     @Param("end") LocalDateTime end);
+
+    // 특정 날짜에 해결된 질문 목록
+    @Query("SELECT q FROM Question q WHERE q.user.id = :userId " +
+           "AND q.resolvedAt IS NOT NULL AND q.resolvedAt >= :start AND q.resolvedAt < :end " +
+           "ORDER BY q.resolvedAt DESC")
+    List<Question> findResolvedOnDate(@Param("userId") Long userId,
                                       @Param("start") LocalDateTime start,
                                       @Param("end") LocalDateTime end);
 }
