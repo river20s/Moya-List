@@ -26,6 +26,7 @@ function AuthenticatedQuestionList() {
   // 게스트 이관 배너
   const [guestQuestions, setGuestQuestions] = useState<GuestQuestion[]>([]);
   const [migrating, setMigrating] = useState(false);
+  const [migrateError, setMigrateError] = useState(false);
 
   useEffect(() => {
     const saved = guestStorage.getAll();
@@ -73,6 +74,7 @@ function AuthenticatedQuestionList() {
 
   const handleMigrate = async () => {
     setMigrating(true);
+    setMigrateError(false);
     try {
       await questionApi.migrateGuest(
         guestQuestions.map((q) => ({ title: q.title, description: q.description, sourceUrl: q.sourceUrl }))
@@ -80,8 +82,10 @@ function AuthenticatedQuestionList() {
       guestStorage.clear();
       setGuestQuestions([]);
       fetchQuestions();
-    } catch {
-      setGuestQuestions([]);
+    } catch (err) {
+      console.error('게스트 질문 이관 실패:', err);
+      setMigrateError(true);
+      // 배너는 유지 — 사용자가 재시도하거나 무시 선택 가능
     } finally {
       setMigrating(false);
     }
@@ -90,6 +94,7 @@ function AuthenticatedQuestionList() {
   const handleDismiss = () => {
     guestStorage.clear();
     setGuestQuestions([]);
+    setMigrateError(false);
   };
 
   const updateParams = (updates: Record<string, string | null>) => {
@@ -136,23 +141,26 @@ function AuthenticatedQuestionList() {
     <div className="min-h-screen">
       {/* 게스트 질문 이관 배너 */}
       {guestQuestions.length > 0 && (
-        <div className="px-4 md:px-8 py-3 bg-blue-50 border-b border-blue-100">
+        <div className={`px-4 md:px-8 py-3 border-b ${migrateError ? 'bg-red-50 border-red-100' : 'bg-blue-50 border-blue-100'}`}>
           <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
-            <p className="text-sm text-blue-700">
-              게스트 상태에서 작성한 질문이 <strong>{guestQuestions.length}개</strong> 있습니다. 계정으로 불러올까요?
+            <p className={`text-sm ${migrateError ? 'text-red-700' : 'text-blue-700'}`}>
+              {migrateError
+                ? '불러오기에 실패했습니다. 다시 시도해 주세요.'
+                : <>게스트 상태에서 작성한 질문이 <strong>{guestQuestions.length}개</strong> 있습니다. 계정으로 불러올까요?</>
+              }
             </p>
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={handleMigrate}
                 disabled={migrating}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-500 disabled:opacity-50 transition-colors"
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-white text-xs rounded-lg disabled:opacity-50 transition-colors ${migrateError ? 'bg-red-500 hover:bg-red-400' : 'bg-blue-600 hover:bg-blue-500'}`}
               >
                 <Download size={13} />
-                {migrating ? '불러오는 중...' : '불러오기'}
+                {migrating ? '불러오는 중...' : (migrateError ? '다시 시도' : '불러오기')}
               </button>
               <button
                 onClick={handleDismiss}
-                className="p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                className={`p-1.5 rounded-lg transition-colors ${migrateError ? 'text-red-400 hover:text-red-600 hover:bg-red-100' : 'text-blue-400 hover:text-blue-600 hover:bg-blue-100'}`}
                 title="무시"
               >
                 <X size={15} />
