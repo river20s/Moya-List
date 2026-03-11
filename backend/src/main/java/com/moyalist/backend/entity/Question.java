@@ -35,6 +35,9 @@ public class Question {
     @Column(name = "is_resolved", nullable = false)
     private Boolean isResolved = false;
 
+    @Column(name = "resolved_at")
+    private LocalDateTime resolvedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -57,6 +60,7 @@ public class Question {
     // isResolved 값을 반전시키는 메서드
     public void toggleResolved() {
         this.isResolved = !this.isResolved;
+        this.resolvedAt = this.isResolved ? LocalDateTime.now() : null;
     }
 
     //태그 추가 메서드

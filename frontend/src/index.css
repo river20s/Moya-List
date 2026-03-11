@@ -57,3 +57,25 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* 랜딩 페이지 — 커서 깜빡임 */
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.landing-cursor {
+  animation: cursor-blink 1s step-end infinite;
+  font-weight: 400;
+  margin-left: 1px;
+}
+
+/* 랜딩 페이지 — 스크롤 유도 바운스 */
+@keyframes scroll-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(8px); }
+}
+
+.scroll-bounce {
+  animation: scroll-bounce 1.8s ease-in-out infinite;
+}

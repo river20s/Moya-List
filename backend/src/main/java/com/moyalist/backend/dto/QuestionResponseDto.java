@@ -19,6 +19,7 @@ public class QuestionResponseDto {
     private String sourceUrl;
     private String description;
     private Boolean isResolved;
+    private LocalDateTime resolvedAt;
     private LocalDateTime createdAt;
     private List<TagResponseDto> tags;
 
@@ -31,6 +32,7 @@ public class QuestionResponseDto {
                 .sourceUrl(question.getSourceUrl())
                 .description(question.getDescription())
                 .isResolved(question.getIsResolved())
+                .resolvedAt(question.getResolvedAt())
                 .createdAt(question.getCreatedAt())
                 .tags(question.getQuestionTags().stream()
                         .map(qt -> TagResponseDto.from(qt.getTag()))

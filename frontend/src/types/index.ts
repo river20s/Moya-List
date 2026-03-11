@@ -20,6 +20,7 @@ export interface Question {
   description: string | null;
   sourceUrl: string | null;
   isResolved: boolean;
+  resolvedAt: string | null;
   createdAt: string;
   tags: Tag[];
 }
