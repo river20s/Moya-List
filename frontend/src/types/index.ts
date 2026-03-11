@@ -7,7 +7,6 @@ export interface Tag {
 }
 
 export interface TagRequest {
-  userId: number;
   name: string;
   color?: string;
 }
@@ -26,7 +25,6 @@ export interface Question {
 }
 
 export interface QuestionRequest {
-  userId: number;
   title: string;
   description?: string;
   sourceUrl?: string;

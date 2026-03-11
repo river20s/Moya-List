@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,9 +31,9 @@ public class QuestionService {
     private final TagRepository tagRepository;
 
     @Transactional
-    public QuestionResponseDto createQuestion(QuestionRequestDto request) {
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + request.getUserId()));
+    public QuestionResponseDto createQuestion(Long userId, QuestionRequestDto request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
 
         Question question = Question.builder()
                 .user(user)
@@ -66,27 +67,40 @@ public class QuestionService {
         return QuestionResponseDto.from(question);
     }
     @Transactional
-    public QuestionResponseDto updateQuestion(Long id, QuestionRequestDto request) {
+    public QuestionResponseDto updateQuestion(Long userId, Long id, QuestionRequestDto request) {
         Question question = questionRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("질문을 찾을 수 없습니다: " + id));
+
+        if (!question.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException("해당 질문을 수정할 권한이 없습니다.");
+        }
 
         question.update(request.getTitle(), request.getSourceUrl(), request.getDescription());
         return QuestionResponseDto.from(question);
     }
 
-    @Transactional // DB 데이터 변경 작업
-    public QuestionResponseDto toggleResolve(Long id) {
-        // ID로 Question 찾기
+    @Transactional
+    public QuestionResponseDto toggleResolve(Long userId, Long id) {
         Question question = questionRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("질문을 찾을 수 없습니다: " + id));
-        question.toggleResolved(); // isResolved 값 반전
-        return QuestionResponseDto.from(question); // DTO로 변환해서 반환
+
+        if (!question.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException("해당 질문을 수정할 권한이 없습니다.");
+        }
+
+        question.toggleResolved();
+        return QuestionResponseDto.from(question);
     }
 
     @Transactional
-    public void deleteQuestion(Long id) {
+    public void deleteQuestion(Long userId, Long id) {
         Question question = questionRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("질문을 찾을 수 없습니다: " + id));
+
+        if (!question.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException("해당 질문을 삭제할 권한이 없습니다.");
+        }
+
         questionRepository.delete(question);
     }
 
@@ -105,6 +119,7 @@ public class QuestionService {
      * 3. Page.map()으로 Question -> QuestionResponseDto 변환
      */
     public Page<QuestionResponseDto> searchQuestions(
+            Long userId,
             String keyword,
             Long tagId,
             Boolean isResolved,
@@ -112,9 +127,8 @@ public class QuestionService {
             LocalDate endDate,
             Pageable pageable) {
 
-        // Specification 생성: null 파라미터는 자동으로 무시됨
         Specification<Question> spec = QuestionSpecification.searchWith(
-                keyword, tagId, isResolved, startDate, endDate);
+                userId, keyword, tagId, isResolved, startDate, endDate);
 
         // Repository에서 Specification과 Pageable을 사용하여 검색
         // Page 객체는 데이터뿐만 아니라 총 개수, 페이지 정보도 포함

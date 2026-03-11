@@ -6,10 +6,10 @@ import com.moyalist.backend.dto.TagResponseDto;
 import com.moyalist.backend.service.TagService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/tags")
@@ -19,9 +19,8 @@ public class TagController {
     private final TagService tagService;
 
     @GetMapping
-    public ResponseEntity<List<TagResponseDto>> getAllTags() {
-        // 모든 태그 반환
-        return ResponseEntity.ok(tagService.getAllTags());
+    public ResponseEntity<List<TagResponseDto>> getAllTags(@AuthenticationPrincipal Long userId) {
+        return ResponseEntity.ok(tagService.getAllTags(userId));
     }
 
     @GetMapping("/{id}")
@@ -31,20 +30,25 @@ public class TagController {
     }
 
     @PostMapping
-    public ResponseEntity<TagResponseDto> createTag(@RequestBody Map<String, String> request) {
-        Long userId = Long.parseLong(request.get("userId"));
-        String name = request.get("name");
-        return ResponseEntity.ok(tagService.createTag(userId, name));
+    public ResponseEntity<TagResponseDto> createTag(
+            @AuthenticationPrincipal Long userId,
+            @RequestBody TagRequestDto request) {
+        return ResponseEntity.ok(tagService.createTag(userId, request.getName()));
     }
 
     @PutMapping("/{id}")
-    public  ResponseEntity<TagResponseDto> updateTag(@RequestBody TagRequestDto request, @PathVariable Long id) {
-        return ResponseEntity.ok(tagService.updateTag(id, request));
+    public ResponseEntity<TagResponseDto> updateTag(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id,
+            @RequestBody TagRequestDto request) {
+        return ResponseEntity.ok(tagService.updateTag(userId, id, request));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteTag(@PathVariable Long id) {
-        tagService.deleteTag(id);
+    public ResponseEntity<Void> deleteTag(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id) {
+        tagService.deleteTag(userId, id);
         return ResponseEntity.noContent().build();
     }
 

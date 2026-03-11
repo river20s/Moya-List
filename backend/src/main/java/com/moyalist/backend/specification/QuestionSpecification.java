@@ -111,6 +111,7 @@ QuestionSpecification {
      * null인 파라미터는 무시됩니다 (동적 쿼리).
      */
     public static Specification<Question> searchWith(
+            Long userId,
             String keyword,
             Long tagId,
             Boolean isResolved,
@@ -119,6 +120,9 @@ QuestionSpecification {
     ) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+
+            // 사용자 조건 추가 (본인 질문만 조회)
+            predicates.add(cb.equal(root.get("user").get("id"), userId));
 
             // 키워드 조건 추가
             if (keyword != null && !keyword.trim().isEmpty()) {

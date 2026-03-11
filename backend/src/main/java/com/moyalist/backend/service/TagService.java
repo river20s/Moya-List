@@ -10,6 +10,7 @@ import com.moyalist.backend.repository.QuestionTagRepository;
 import com.moyalist.backend.repository.TagRepository;
 import com.moyalist.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,19 +27,16 @@ public class TagService {
     private final UserRepository userRepository;
     private final QuestionTagRepository questionTagRepository;
 
-    public List<TagResponseDto> getAllTags() {
-        // 모든 태그 조회
-        List<Tag> tags = tagRepository.findAll();
+    public List<TagResponseDto> getAllTags(Long userId) {
+        List<Tag> tags = tagRepository.findByUserId(userId);
 
-        // 태그별 질문 개수 조회하고 Map으로 변환
-        // [[1, 5], [2, 3]] -> {1: 5, 2: 3}
-        List<Object[]> countResults = tagRepository.countQuestionsByTag();
+        List<Object[]> countResults = tagRepository.countQuestionsByTagAndUserId(userId);
         Map<Long, Long> countMap = countResults.stream()
                 .collect(Collectors.toMap(
-                        row -> (Long) row[0], // key: 태그 ID
-                        row -> (Long) row[1] // value: 개수
+                        row -> (Long) row[0],
+                        row -> (Long) row[1]
                 ));
-        // 태그 + 개수 합쳐서 DTO 변환
+
         return tags.stream()
                 .map(tag -> TagResponseDto.from(tag, countMap.getOrDefault(tag.getId(), 0L)))
                 .collect(Collectors.toList());
@@ -63,21 +61,30 @@ public class TagService {
     }
 
     @Transactional
-    public TagResponseDto updateTag(Long id, TagRequestDto request) {
+    public TagResponseDto updateTag(Long userId, Long id, TagRequestDto request) {
         Tag tag = tagRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("태그를 찾을 수 없습니다: " + id));
+
+        if (!tag.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException("해당 태그를 수정할 권한이 없습니다.");
+        }
+
         tag.update(request.getName(), request.getColor());
         return TagResponseDto.from(tag);
     }
 
     @Transactional
-    public void deleteTag(Long id) {
-        Tag tag = tagRepository.findById(id) // 태그 찾기
-                .orElseThrow(() -> new IllegalArgumentException("태그를 찾을 수 없습니다: " + id)); // 예외 (없으면)
-        // 연결된 question_tags 먼저 삭제
+    public void deleteTag(Long userId, Long id) {
+        Tag tag = tagRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("태그를 찾을 수 없습니다: " + id));
+
+        if (!tag.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException("해당 태그를 삭제할 권한이 없습니다.");
+        }
+
         List<QuestionTag> questionTags = questionTagRepository.findByTagId(id);
         questionTagRepository.deleteAll(questionTags);
-        tagRepository.delete(tag); // 태그 삭제
+        tagRepository.delete(tag);
     }
 
     public List<QuestionResponseDto> getQuestionsByTagId(Long tagId) {
