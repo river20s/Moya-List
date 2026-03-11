@@ -22,6 +22,7 @@ CREATE TABLE `questions` (
 	`description` TEXT NULL,
 	`source_url` VARCHAR(1000) NULL,
 	`is_resolved` BOOLEAN NOT NULL DEFAULT FALSE,
+	`resolved_at` DATETIME NULL,
 	`created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	PRIMARY KEY (`id`)
 );

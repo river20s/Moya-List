@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { getTagColor } from '../constants/colors';
 import { tagApi } from '../api/tags';
 import type { Tag } from '../types';
+import ActivityHeatmap from './ActivityHeatmap';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -141,28 +142,7 @@ function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
         </div>
 
-        {/* 활동 히트맵 (플레이스홀더) */}
-        <div className="space-y-2 border-t border-slate-300/50 pt-4">
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1">
-            Activity
-          </h3>
-          <div className="px-1">
-            <div className="bg-white/30 rounded-lg p-3">
-              <div className="grid grid-cols-12 gap-1">
-                {Array.from({ length: 84 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="w-2.5 h-2.5 rounded-sm bg-slate-200"
-                  />
-                ))}
-              </div>
-              <div className="flex items-center justify-between mt-2 text-[10px] text-slate-400">
-                <span>12주 전</span>
-                <span>오늘</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ActivityHeatmap />
       </div>
     </aside>
   );
