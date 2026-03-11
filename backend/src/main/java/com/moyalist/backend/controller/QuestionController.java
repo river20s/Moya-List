@@ -51,6 +51,7 @@ public class QuestionController {
      */
     @GetMapping
     public ResponseEntity<Page<QuestionResponseDto>> getAllQuestions(
+            @AuthenticationPrincipal Long userId,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Long tagId,
             @RequestParam(required = false) Boolean isResolved,
@@ -60,20 +61,16 @@ public class QuestionController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "createdAt,desc") String sort) {
 
-        // 정렬 조건 파싱
-        // "createdAt,desc" -> Sort.by(Sort.Direction.DESC, "createdAt")
         String[] sortParams = sort.split(",");
         Sort.Direction direction = sortParams.length > 1 && sortParams[1].equalsIgnoreCase("asc")
                 ? Sort.Direction.ASC
                 : Sort.Direction.DESC;
         Sort sortBy = Sort.by(direction, sortParams[0]);
 
-        // Pageable 객체 생성: 페이지 번호, 크기, 정렬 정보 포함
         Pageable pageable = PageRequest.of(page, size, sortBy);
 
-        // 검색 실행
         Page<QuestionResponseDto> result = questionService.searchQuestions(
-                keyword, tagId, isResolved, startDate, endDate, pageable
+                userId, keyword, tagId, isResolved, startDate, endDate, pageable
         );
 
         return ResponseEntity.ok(result);
@@ -85,21 +82,25 @@ public class QuestionController {
     }
 
     @PatchMapping("/{id}/resolve")
-    public ResponseEntity<QuestionResponseDto> toggleResolveStatus(@PathVariable Long id) {
-        return ResponseEntity.ok(questionService.toggleResolve(id));
+    public ResponseEntity<QuestionResponseDto> toggleResolveStatus(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id) {
+        return ResponseEntity.ok(questionService.toggleResolve(userId, id));
     }
-
 
     @PutMapping("/{id}")
     public ResponseEntity<QuestionResponseDto> updateQuestion(
+            @AuthenticationPrincipal Long userId,
             @PathVariable Long id,
             @Valid @RequestBody QuestionRequestDto request) {
-        return ResponseEntity.ok(questionService.updateQuestion(id, request));
+        return ResponseEntity.ok(questionService.updateQuestion(userId, id, request));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteQuestion(@PathVariable Long id) {
-        questionService.deleteQuestion(id);
+    public ResponseEntity<Void> deleteQuestion(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id) {
+        questionService.deleteQuestion(userId, id);
         return ResponseEntity.noContent().build();
     }
 }

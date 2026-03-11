@@ -19,9 +19,8 @@ public class TagController {
     private final TagService tagService;
 
     @GetMapping
-    public ResponseEntity<List<TagResponseDto>> getAllTags() {
-        // 모든 태그 반환
-        return ResponseEntity.ok(tagService.getAllTags());
+    public ResponseEntity<List<TagResponseDto>> getAllTags(@AuthenticationPrincipal Long userId) {
+        return ResponseEntity.ok(tagService.getAllTags(userId));
     }
 
     @GetMapping("/{id}")
@@ -38,13 +37,18 @@ public class TagController {
     }
 
     @PutMapping("/{id}")
-    public  ResponseEntity<TagResponseDto> updateTag(@RequestBody TagRequestDto request, @PathVariable Long id) {
-        return ResponseEntity.ok(tagService.updateTag(id, request));
+    public ResponseEntity<TagResponseDto> updateTag(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id,
+            @RequestBody TagRequestDto request) {
+        return ResponseEntity.ok(tagService.updateTag(userId, id, request));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteTag(@PathVariable Long id) {
-        tagService.deleteTag(id);
+    public ResponseEntity<Void> deleteTag(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id) {
+        tagService.deleteTag(userId, id);
         return ResponseEntity.noContent().build();
     }
 
