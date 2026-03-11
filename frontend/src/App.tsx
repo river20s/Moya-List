@@ -1,13 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
-import HomePage from './pages/HomePage';
 import QuestionListPage from './pages/QuestionListPage';
 import TagListPage from './pages/TagListPage';
 import LoginPage from './pages/LoginPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
 
-/** 로그인하지 않으면 /login으로 보내는 가드 컴포넌트 */
+/** 로그인이 필요한 페이지 — 미인증 시 /login으로 이동 */
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return null;
@@ -20,10 +19,12 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
-      <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
-      <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
+      {/* 게스트·로그인 모두 접근 가능 */}
+      <Route element={<Layout />}>
+        <Route path="/" element={<Navigate to="/questions" replace />} />
         <Route path="questions" element={<QuestionListPage />} />
-        <Route path="tags" element={<TagListPage />} />
+        {/* 태그는 서버 데이터 → 로그인 필요 */}
+        <Route path="tags" element={<PrivateRoute><TagListPage /></PrivateRoute>} />
       </Route>
     </Routes>
   );

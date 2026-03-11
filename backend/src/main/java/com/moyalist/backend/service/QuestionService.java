@@ -1,5 +1,6 @@
 package com.moyalist.backend.service;
 
+import com.moyalist.backend.dto.GuestQuestionDto;
 import com.moyalist.backend.dto.QuestionRequestDto;
 import com.moyalist.backend.dto.QuestionResponseDto;
 import com.moyalist.backend.entity.Question;
@@ -118,6 +119,25 @@ public class QuestionService {
      * 2. questionRepository.findAll(spec, pageable)로 조건에 맞는 데이터 조회
      * 3. Page.map()으로 Question -> QuestionResponseDto 변환
      */
+    @Transactional
+    public List<QuestionResponseDto> migrateGuestQuestions(Long userId, List<GuestQuestionDto> guestQuestions) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
+
+        return guestQuestions.stream()
+                .map(dto -> {
+                    Question q = Question.builder()
+                            .user(user)
+                            .title(dto.getTitle())
+                            .description(dto.getDescription())
+                            .sourceUrl(dto.getSourceUrl())
+                            .isResolved(false)
+                            .build();
+                    return QuestionResponseDto.from(questionRepository.save(q));
+                })
+                .collect(Collectors.toList());
+    }
+
     public Page<QuestionResponseDto> searchQuestions(
             Long userId,
             String keyword,

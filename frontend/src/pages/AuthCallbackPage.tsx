@@ -4,13 +4,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 /**
  * OAuth2 로그인 완료 후 리다이렉트되는 페이지.
  *
- * 백엔드 OAuth2SuccessHandler가 이 URL로 리다이렉트한다:
- *   /auth/callback?token=eyJhbGci...
- *
- * 이 페이지에서:
- * 1. URL의 token 쿼리 파라미터를 꺼냄
- * 2. localStorage에 저장
- * 3. 메인 페이지로 이동
+ * 1. URL의 token을 localStorage에 저장
+ * 2. /questions으로 이동 (게스트 질문 이관은 QuestionListPage에서 사용자에게 확인 후 진행)
  */
 function AuthCallbackPage() {
   const [searchParams] = useSearchParams();
