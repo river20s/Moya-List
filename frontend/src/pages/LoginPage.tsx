@@ -1,6 +1,9 @@
+import { useNavigate } from 'react-router-dom';
+
 function LoginPage() {
+  const navigate = useNavigate();
+
   const handleGoogleLogin = () => {
-    // 백엔드의 Spring Security OAuth2 엔드포인트로 이동
     window.location.href = 'http://localhost:8080/oauth2/authorization/google';
   };
 
@@ -9,15 +12,34 @@ function LoginPage() {
       <h1 className="logo-font text-4xl text-slate-700 font-semibold mb-2">Moya List</h1>
       <p className="text-slate-400 text-sm mb-12">이게 뭐야? 하는 궁금증을 빠르게 캡처하세요</p>
 
-      <div className="w-full max-w-sm bg-white/70 rounded-2xl p-8 shadow-sm border border-slate-200/50">
-        <h2 className="text-lg font-medium text-slate-700 mb-6 text-center">로그인</h2>
+      <div className="w-full max-w-sm bg-white/70 rounded-2xl p-8 shadow-sm border border-slate-200/50 space-y-3">
+        <h2 className="text-lg font-medium text-slate-700 mb-6 text-center">시작하기</h2>
+
         <button
           onClick={handleGoogleLogin}
           className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-700 text-sm font-medium shadow-sm"
         >
           <GoogleIcon />
-          Google로 계속하기
+          Google로 로그인
         </button>
+
+        <div className="flex items-center gap-3 py-1">
+          <div className="flex-1 h-px bg-slate-200" />
+          <span className="text-xs text-slate-400">또는</span>
+          <div className="flex-1 h-px bg-slate-200" />
+        </div>
+
+        <button
+          onClick={() => navigate('/questions')}
+          className="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm hover:bg-slate-50 transition-colors"
+        >
+          게스트로 시작
+        </button>
+
+        <p className="text-center text-[11px] text-slate-400 pt-1 leading-relaxed">
+          게스트 모드는 이 브라우저에만 저장됩니다.
+          <br />로그인 시 작성한 내용이 계정으로 이관됩니다.
+        </p>
       </div>
     </div>
   );

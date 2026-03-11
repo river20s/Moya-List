@@ -12,6 +12,12 @@ export interface QuestionSearchParams {
   sort?: string;
 }
 
+export interface GuestQuestionPayload {
+  title: string;
+  description?: string;
+  sourceUrl?: string;
+}
+
 export const questionApi = {
   getAll(params?: QuestionSearchParams) {
     return api.get<Page<Question>>('/questions', { params });
@@ -35,5 +41,9 @@ export const questionApi = {
 
   delete(id: number) {
     return api.delete(`/questions/${id}`);
+  },
+
+  migrateGuest(questions: GuestQuestionPayload[]) {
+    return api.post<Question[]>('/questions/migrate', questions);
   },
 };

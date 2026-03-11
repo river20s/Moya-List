@@ -1,4 +1,5 @@
-import { Menu, LogIn, User, LogOut } from 'lucide-react';
+import { Menu, LogIn, User, LogOut, Info } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
@@ -7,6 +8,7 @@ interface HeaderProps {
 
 function Header({ onMenuClick }: HeaderProps) {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <header className="flex items-center justify-between px-4 md:px-8 py-4 bg-[#F0EFEB]/80 backdrop-blur-sm border-b border-slate-300/50">
@@ -24,14 +26,32 @@ function Header({ onMenuClick }: HeaderProps) {
 
       <div className="flex items-center gap-2">
         {!user ? (
-          <button
-            onClick={() => window.location.href = '/login'}
-            className="flex items-center gap-1 px-3 py-1.5 bg-slate-700 text-white text-xs rounded-lg hover:bg-slate-600 transition-colors"
-          >
-            <LogIn size={14} />
-            로그인
-          </button>
+          // 게스트 모드
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg">
+              <span className="text-xs text-slate-400">게스트 모드</span>
+              {/* 툴팁 */}
+              <div className="relative group">
+                <Info size={13} className="text-slate-400 cursor-help" />
+                <div className="absolute right-0 top-6 z-50 hidden group-hover:block w-64 p-3 bg-slate-800 text-white text-xs rounded-xl shadow-lg leading-relaxed">
+                  현재 질문은 이 브라우저에만 저장됩니다.
+                  <br /><br />
+                  다른 기기에서 이어보거나 영구적으로 저장하려면 로그인하세요. 로그인 시 입력한 질문이 자동으로 계정에 저장됩니다.
+                  {/* 툴팁 화살표 */}
+                  <div className="absolute -top-1.5 right-3 w-3 h-3 bg-slate-800 rotate-45" />
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/login')}
+              className="flex items-center gap-1 px-3 py-1.5 bg-slate-700 text-white text-xs rounded-lg hover:bg-slate-600 transition-colors"
+            >
+              <LogIn size={13} />
+              로그인
+            </button>
+          </div>
         ) : (
+          // 로그인 상태
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg">
               <User size={16} className="text-slate-600" />

@@ -1,5 +1,6 @@
 package com.moyalist.backend.controller;
 
+import com.moyalist.backend.dto.GuestQuestionDto;
 import com.moyalist.backend.dto.QuestionRequestDto;
 import com.moyalist.backend.dto.QuestionResponseDto;
 import com.moyalist.backend.service.QuestionService;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import org.springframework.http.HttpStatus;
 
 @RestController
 @RequestMapping("/api/questions")
@@ -94,6 +96,17 @@ public class QuestionController {
             @PathVariable Long id,
             @Valid @RequestBody QuestionRequestDto request) {
         return ResponseEntity.ok(questionService.updateQuestion(userId, id, request));
+    }
+
+    /** 게스트 질문 목록을 로그인 사용자 계정으로 이관 */
+    @PostMapping("/migrate")
+    public ResponseEntity<List<QuestionResponseDto>> migrateGuestQuestions(
+            @AuthenticationPrincipal Long userId,
+            @RequestBody List<GuestQuestionDto> guestQuestions) {
+        if (guestQuestions == null || guestQuestions.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        }
+        return ResponseEntity.ok(questionService.migrateGuestQuestions(userId, guestQuestions));
     }
 
     @DeleteMapping("/{id}")
