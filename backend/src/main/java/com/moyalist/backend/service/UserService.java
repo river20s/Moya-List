@@ -6,6 +6,7 @@ import com.moyalist.backend.dto.UserUpdateRequest;
 import com.moyalist.backend.entity.User;
 import com.moyalist.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,7 +51,10 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponseDto updateUser(Long id, UserUpdateRequest request) {
+    public UserResponseDto updateUser(Long userId, Long id, UserUpdateRequest request) {
+        if (!userId.equals(id)) {
+            throw new AccessDeniedException("본인의 프로필만 수정할 수 있습니다.");
+        }
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + id));
 
@@ -59,7 +63,10 @@ public class UserService {
     }
 
     @Transactional
-    public void deleteUser(Long id) {
+    public void deleteUser(Long userId, Long id) {
+        if (!userId.equals(id)) {
+            throw new AccessDeniedException("본인의 계정만 삭제할 수 있습니다.");
+        }
         if (!userRepository.existsById(id)) {
             throw new IllegalArgumentException("사용자를 찾을 수 없습니다: " + id);
         }

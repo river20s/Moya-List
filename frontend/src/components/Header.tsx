@@ -63,10 +63,13 @@ function Header({ onMenuClick, logoCenter = false }: HeaderProps) {
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg">
+            <button
+              onClick={() => navigate('/profile')}
+              className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-200/50 rounded-lg transition-colors"
+            >
               <User size={16} className="text-slate-600" />
               <span className="text-xs text-slate-600">{user.name}</span>
-            </div>
+            </button>
             <button
               onClick={logout}
               className="flex items-center gap-1 px-3 py-1.5 hover:bg-slate-200/50 rounded-lg transition-colors text-slate-500"
