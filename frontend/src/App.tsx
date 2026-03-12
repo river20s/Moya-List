@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import MainPage from './pages/MainPage';
 import QuestionListPage from './pages/QuestionListPage';
+import QuestionDetailPage from './pages/QuestionDetailPage';
 import TagListPage from './pages/TagListPage';
 import LoginPage from './pages/LoginPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
@@ -25,6 +26,7 @@ function AppRoutes() {
       {/* 게스트·로그인 모두 접근 가능 */}
       <Route element={<Layout />}>
         <Route path="questions" element={<QuestionListPage />} />
+        <Route path="questions/:id" element={<PrivateRoute><QuestionDetailPage /></PrivateRoute>} />
         {/* 태그는 서버 데이터 → 로그인 필요 */}
         <Route path="tags" element={<PrivateRoute><TagListPage /></PrivateRoute>} />
       </Route>
