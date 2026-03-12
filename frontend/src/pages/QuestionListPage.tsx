@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Plus, Lightbulb, Trash2, Download, X } from 'lucide-react';
 import FilterBar from '../components/FilterBar';
 import QuestionCard from '../components/QuestionCard';
@@ -14,6 +14,7 @@ import { guestStorage, type GuestQuestion } from '../utils/guestStorage';
 
 function AuthenticatedQuestionList() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
@@ -204,7 +205,7 @@ function AuthenticatedQuestionList() {
         ) : (
           <div className="max-w-3xl mx-auto space-y-4">
             {questions.map((q) => (
-              <QuestionCard key={q.id} question={q} onToggleResolved={handleToggleResolved} onDelete={handleDelete} />
+              <QuestionCard key={q.id} question={q} onToggleResolved={handleToggleResolved} onDelete={handleDelete} onClick={(q) => navigate(`/questions/${q.id}`)} />
             ))}
             {totalPages > 1 && (
               <div className="flex justify-center items-center gap-2 pt-6">
