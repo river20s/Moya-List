@@ -38,6 +38,8 @@ export interface User {
   name: string;
   email: string;
   profileUrl: string | null;
+  provider: string;
+  createdAt: string;
 }
 
 // 페이지네이션 응답 타입

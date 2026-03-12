@@ -7,6 +7,7 @@ import com.moyalist.backend.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,14 +35,18 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<UserResponseDto> updateUser(@PathVariable Long id,
-                                                      @Valid @RequestBody UserUpdateRequest request) {
-        return ResponseEntity.ok(userService.updateUser(id, request));
+    public ResponseEntity<UserResponseDto> updateUser(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id,
+            @Valid @RequestBody UserUpdateRequest request) {
+        return ResponseEntity.ok(userService.updateUser(userId, id, request));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
-        userService.deleteUser(id);
+    public ResponseEntity<Void> deleteUser(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id) {
+        userService.deleteUser(userId, id);
         return ResponseEntity.noContent().build();
     }
 }
