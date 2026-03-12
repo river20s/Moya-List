@@ -3,6 +3,8 @@ import { X, Plus } from 'lucide-react';
 import { questionApi } from '../api/questions';
 import { tagApi } from '../api/tags';
 import { getTagColor } from '../constants/colors';
+import HashtagInput from './HashtagInput';
+import { parseHashtags } from '../utils/parseHashtags';
 import type { Tag } from '../types';
 
 interface QuestionCreateModalProps {
@@ -30,11 +32,26 @@ function QuestionCreateModal({ isOpen, onClose, onCreated }: QuestionCreateModal
 
     try {
       setSubmitting(true);
+
+      // 제목에서 #태그 파싱 후 ID 변환 (없으면 자동 생성)
+      const { cleanTitle, tagNames } = parseHashtags(title);
+      const resolvedIds = [...selectedTagIds];
+      for (const name of tagNames) {
+        const existing = tags.find((t) => t.name.toLowerCase() === name.toLowerCase());
+        if (existing) {
+          if (!resolvedIds.includes(existing.id)) resolvedIds.push(existing.id);
+        } else {
+          const res = await tagApi.create({ name });
+          resolvedIds.push(res.data.id);
+          setTags((prev) => [...prev, res.data]);
+        }
+      }
+
       await questionApi.create({
-        title: title.trim(),
+        title: cleanTitle || title.trim(),
         description: description.trim() || undefined,
         sourceUrl: sourceUrl.trim() || undefined,
-        tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
+        tagIds: resolvedIds.length > 0 ? resolvedIds : undefined,
       });
       // 초기화 후 닫기
       setTitle('');
@@ -85,17 +102,16 @@ function QuestionCreateModal({ isOpen, onClose, onCreated }: QuestionCreateModal
             <label className="block text-sm font-medium text-slate-700 mb-1">
               궁금한 것 <span className="text-red-400">*</span>
             </label>
-            <input
-              type="text"
+            <HashtagInput
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={setTitle}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey && title.trim()) {
                   handleSubmit();
                 }
               }}
-              placeholder="이게 뭐야? 하는 궁금증을 적어보세요"
-              className="w-full px-3 py-2.5 bg-white/50 border border-slate-300/50 rounded-lg text-sm focus:outline-none focus:border-slate-400 focus:bg-white transition-all"
+              placeholder="이게 뭐야? 하는 궁금증을 적어보세요 (#태그 로 태그 추가)"
+              className="w-full bg-white/50"
               autoFocus
             />
           </div>
