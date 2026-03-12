@@ -4,11 +4,13 @@ import { Plus, Lightbulb, Trash2, Download, X } from 'lucide-react';
 import FilterBar from '../components/FilterBar';
 import QuestionCard from '../components/QuestionCard';
 import QuestionCreateModal from '../components/QuestionCreateModal';
+import HashtagInput from '../components/HashtagInput';
 import { questionApi } from '../api/questions';
 import { tagApi } from '../api/tags';
 import type { Question, Tag } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { guestStorage, type GuestQuestion } from '../utils/guestStorage';
+import { parseHashtags } from '../utils/parseHashtags';
 
 // ─── 로그인 사용자용 ─────────────────────────────────────────────────────────
 
@@ -128,10 +130,22 @@ function AuthenticatedQuestionList() {
     }
   };
 
-  const handleQuickAdd = async (title: string) => {
+  const handleQuickAdd = async (title: string, tagNames: string[]) => {
     if (!title.trim()) return;
     try {
-      await questionApi.create({ title: title.trim() });
+      // 태그명 → ID 변환 (없으면 자동 생성)
+      const tagIds: number[] = [];
+      for (const name of tagNames) {
+        const existing = tags.find((t) => t.name.toLowerCase() === name.toLowerCase());
+        if (existing) {
+          tagIds.push(existing.id);
+        } else {
+          const res = await tagApi.create({ name });
+          tagIds.push(res.data.id);
+          setTags((prev) => [...prev, res.data]);
+        }
+      }
+      await questionApi.create({ title: title.trim(), tagIds: tagIds.length > 0 ? tagIds : undefined });
       fetchQuestions();
     } catch {
       // 실패 시 조용히 처리
@@ -343,24 +357,25 @@ function GuestQuestionCard({
 
 // ─── 공통 컴포넌트 ────────────────────────────────────────────────────────────
 
-function QuickInput({ onSubmit, onDetailClick }: { onSubmit: (title: string) => void; onDetailClick?: () => void }) {
+function QuickInput({ onSubmit, onDetailClick }: { onSubmit: (title: string, tagNames: string[]) => void; onDetailClick?: () => void }) {
   const [value, setValue] = useState('');
 
   const handleSubmit = () => {
     if (!value.trim()) return;
-    onSubmit(value.trim());
+    const { cleanTitle, tagNames } = parseHashtags(value);
+    if (!cleanTitle) return;
+    onSubmit(cleanTitle, tagNames);
     setValue('');
   };
 
   return (
     <div className="flex gap-2">
-      <input
-        type="text"
+      <HashtagInput
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={setValue}
         onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
-        placeholder="궁금한 것을 빠르게 입력하세요..."
-        className="flex-1 px-4 py-3 bg-white/50 border border-slate-300/50 rounded-xl text-sm focus:outline-none focus:border-slate-400 focus:bg-white transition-all"
+        placeholder="궁금한 것을 빠르게 입력하세요... (#태그 로 태그 추가)"
+        className="flex-1 bg-white/50 focus-within:bg-white transition-all"
         autoFocus
       />
       {onDetailClick && (
